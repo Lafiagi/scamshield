@@ -10,7 +10,7 @@ import "react-toastify/dist/ReactToastify.css";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 // import Dashboard from "./pages/Dashboard";
-// import ReportForm from "./pages/ReportForm";
+import ReportForm from "./pages/ReportForm";
 // import ReportDetails from "./pages/ReportDetails";
 // import SearchPage from "./pages/SearchPage";
 import LandingPage from "./pages/LandingPage";
@@ -56,14 +56,15 @@ function App() {
       <main className="container mx-auto px-4 py-8 min-h-screen">
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          {/* <Route
-            path="/dashboard"
-            element={connected ? <Dashboard /> : <Navigate to="/" />}
-          />
           <Route
             path="/report"
             element={connected ? <ReportForm /> : <Navigate to="/" />}
           />
+          {/* <Route
+            path="/dashboard"
+            element={connected ? <Dashboard /> : <Navigate to="/" />}
+          />
+          
           <Route path="/reports/:id" element={<ReportDetails />} />
           <Route path="/search" element={<SearchPage />} />
           <Route
