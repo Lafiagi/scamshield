@@ -9,13 +9,13 @@ import "react-toastify/dist/ReactToastify.css";
 // Components
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import Dashboard from "./pages/Dashboard";
-import ReportForm from "./pages/ReportForm";
-import ReportDetails from "./pages/ReportDetails";
-import SearchPage from "./pages/SearchPage";
+// import Dashboard from "./pages/Dashboard";
+// import ReportForm from "./pages/ReportForm";
+// import ReportDetails from "./pages/ReportDetails";
+// import SearchPage from "./pages/SearchPage";
 import LandingPage from "./pages/LandingPage";
-import ProfilePage from "./pages/ProfilePage";
-import VerificationQueue from "./pages/VerificationQueue";
+// import ProfilePage from "./pages/ProfilePage";
+// import VerificationQueue from "./pages/VerificationQueue";
 
 import "./App.css";
 
@@ -56,7 +56,7 @@ function App() {
       <main className="container mx-auto px-4 py-8 min-h-screen">
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route
+          {/* <Route
             path="/dashboard"
             element={connected ? <Dashboard /> : <Navigate to="/" />}
           />
@@ -73,7 +73,7 @@ function App() {
           <Route
             path="/verify"
             element={connected ? <VerificationQueue /> : <Navigate to="/" />}
-          />
+          /> */}
         </Routes>
       </main>
       <Footer />
