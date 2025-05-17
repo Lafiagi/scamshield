@@ -259,7 +259,7 @@ module scam_shield::report_registry {
         // Determine status based on verification vs rejection count
         if (report.verification_count > report.rejection_count) {
             report.status = status_verified();
-            // In a complete implementation, we would reward the reporter here
+            // In our V2 implementation, we would reward the reporter here
             // and penalize the scammer address
         } else {
             report.status = status_rejected();
