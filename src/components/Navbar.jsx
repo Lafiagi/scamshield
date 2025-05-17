@@ -62,22 +62,22 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
                 >
                   Report Scam
                 </Link>
-                <Link
+                {/* <Link
                   to="/verify"
                   className={`font-medium hover:text-blue-600 dark:hover:text-blue-400 ${isActive(
                     "/verify"
                   )}`}
                 >
                   Verify
-                </Link>
-                <Link
+                </Link> */}
+                {/* <Link
                   to="/profile"
                   className={`font-medium hover:text-blue-600 dark:hover:text-blue-400 ${isActive(
                     "/profile"
                   )}`}
                 >
                   Profile
-                </Link>
+                </Link> */}
               </>
             )}
             <button

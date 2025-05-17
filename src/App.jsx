@@ -1,7 +1,7 @@
 // src/App.jsx
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { ConnectButton, useWallet } from "@suiet/wallet-kit";
+import { useWallet } from "@suiet/wallet-kit";
 import "@suiet/wallet-kit/style.css";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -9,18 +9,16 @@ import "react-toastify/dist/ReactToastify.css";
 // Components
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-// import Dashboard from "./pages/Dashboard";
+import Dashboard from "./pages/Dashboard";
 import ReportForm from "./pages/ReportForm";
-// import ReportDetails from "./pages/ReportDetails";
-// import SearchPage from "./pages/SearchPage";
+import ReportDetails from "./pages/ReportDetails";
+import SearchPage from "./pages/SearchPage";
 import LandingPage from "./pages/LandingPage";
-// import ProfilePage from "./pages/ProfilePage";
-// import VerificationQueue from "./pages/VerificationQueue";
 
 import "./App.css";
 
 function App() {
-  const { connected, account } = useWallet();
+  const { connected } = useWallet();
   const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
@@ -60,21 +58,12 @@ function App() {
             path="/report"
             element={connected ? <ReportForm /> : <Navigate to="/" />}
           />
-          {/* <Route
+          <Route path="/search" element={<SearchPage />} />
+          <Route
             path="/dashboard"
             element={connected ? <Dashboard /> : <Navigate to="/" />}
           />
-          
           <Route path="/reports/:id" element={<ReportDetails />} />
-          <Route path="/search" element={<SearchPage />} />
-          <Route
-            path="/profile"
-            element={connected ? <ProfilePage /> : <Navigate to="/" />}
-          />
-          <Route
-            path="/verify"
-            element={connected ? <VerificationQueue /> : <Navigate to="/" />}
-          /> */}
         </Routes>
       </main>
       <Footer />
