@@ -1,5 +1,4 @@
-// src/pages/ReportDetails.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useWallet } from "@suiet/wallet-kit";
 import {
@@ -16,147 +15,9 @@ import {
   X,
   Info,
   Code,
+  Loader,
 } from "lucide-react";
 import axiosClient from "../utils/apiClient";
-
-// Mock data for demonstration
-const MOCK_REPORTS = {
-  1: {
-    id: "1",
-    title: "Fake SUI Mining Pool",
-    type: "Website",
-    status: "Verified",
-    riskLevel: "High",
-    reportedBy: "0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b",
-    reportDate: "2025-04-28",
-    verificationCount: 12,
-    description:
-      "This website claims to offer SUI mining services but is actually a scam designed to steal user funds. The site mimics legitimate mining platforms but all deposited funds are immediately transferred to the scammer's wallet.",
-    url: "https://fake-sui-mining.com",
-    address: "0x7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3",
-    evidence: [
-      {
-        type: "Transaction",
-        description: "Fund withdrawal to known scammer wallet",
-        link: "0x8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a",
-      },
-      {
-        type: "Screenshot",
-        description: "False guarantees of returns",
-        link: "screenshot1.jpg",
-      },
-      {
-        type: "Report",
-        description: "Similar scam reported on SUI forums",
-        link: "https://community.sui.io/t/scam-alert-fake-mining-pool",
-      },
-    ],
-    verifications: [
-      {
-        verifier: "0x2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f",
-        timestamp: "2025-04-29",
-        verified: true,
-        comment:
-          "I can confirm this is a scam. Lost 50 SUI to this site before realizing.",
-      },
-      {
-        verifier: "0x3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2e",
-        timestamp: "2025-04-30",
-        verified: true,
-        comment:
-          "Analyzed the contract, it has no withdrawal function for users.",
-      },
-    ],
-    scamTactics: [
-      "Promises unrealistic returns (25% daily)",
-      'Fake testimonials from "successful miners"',
-      'Urgency tactics claiming "limited spots available"',
-      "Professional-looking but recently created website",
-    ],
-    timeline: [
-      {
-        date: "2025-04-25",
-        event: "Website created",
-      },
-      {
-        date: "2025-04-26",
-        event: "First reported victim",
-      },
-      {
-        date: "2025-04-28",
-        event: "Report submitted to ScamShield",
-      },
-      {
-        date: "2025-04-30",
-        event: "Verified by community",
-      },
-    ],
-  },
-  2: {
-    id: "2",
-    title: "Fraudulent SUI Token Swap",
-    type: "Smart Contract",
-    status: "Under Review",
-    riskLevel: "Medium",
-    reportedBy: "0x5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x",
-    reportDate: "2025-05-01",
-    verificationCount: 5,
-    description:
-      "Smart contract that claims to swap tokens but actually drains user wallets once approval is given. The contract has a hidden function that transfers all approved tokens to the creator's wallet.",
-    url: "",
-    address: "0x1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b",
-    evidence: [
-      {
-        type: "Code",
-        description: "Malicious contract code",
-        link: "https://explorer.sui.io/contract/0x1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b",
-      },
-      {
-        type: "Transaction",
-        description: "Exploit transaction",
-        link: "0x9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b",
-      },
-    ],
-    verifications: [
-      {
-        verifier: "0x4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a",
-        timestamp: "2025-05-02",
-        verified: true,
-        comment: "Code review confirms malicious functions in the contract.",
-      },
-      {
-        verifier: "0x5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4f",
-        timestamp: "2025-05-02",
-        verified: false,
-        comment: "I need more evidence to verify this claim.",
-      },
-    ],
-    scamTactics: [
-      "Impersonates legitimate DEX interface",
-      "Offers slightly better exchange rates to lure victims",
-      "Hidden functions in unverified smart contract",
-      "Promoted through airdrop scams",
-    ],
-    timeline: [
-      {
-        date: "2025-04-29",
-        event: "Contract deployed",
-      },
-      {
-        date: "2025-04-30",
-        event: "Promotion started on social media",
-      },
-      {
-        date: "2025-05-01",
-        event: "Report submitted to ScamShield",
-      },
-      {
-        date: "2025-05-02",
-        event: "Under community review",
-      },
-    ],
-  },
-};
 
 const EvidenceItem = ({ evidence }) => (
   <div className="flex items-start p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -209,7 +70,11 @@ const VerificationItem = ({ verification }) => (
         </span>
       </div>
       <span className="text-sm text-gray-500 dark:text-gray-400">
-        {verification.timestamp}
+        {new Date(verification.timestamp).toLocaleDateString("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })}
       </span>
     </div>
     <p className="text-gray-600 dark:text-gray-300 text-sm">
@@ -228,7 +93,11 @@ const TimelineItem = ({ item, isLast }) => (
     </div>
     <div className="pb-6">
       <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-        {item.date}
+        {new Date(item.date).toLocaleDateString("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })}
       </p>
       <p className="text-gray-900 dark:text-white">{item.event}</p>
     </div>
@@ -238,19 +107,64 @@ const TimelineItem = ({ item, isLast }) => (
 const ReportDetails = () => {
   const { id } = useParams();
   const { connected } = useWallet();
-  const report = MOCK_REPORTS[id];
+
+  // State management
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [verificationInput, setVerificationInput] = useState("");
   const [verifyStatus, setVerifyStatus] = useState(null);
-axiosClient.get(`/reports/${id}`)
-  if (!report) {
+  const [verifyLoading, setVerifyLoading] = useState(false);
+
+  // Fetch report data
+  useEffect(() => {
+    const fetchReport = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await axiosClient.get(`/reports/${id}`);
+        setReport(response.data);
+      } catch (err) {
+        console.error("Error fetching report:", err);
+        setError(
+          err.response?.data?.message || "Failed to fetch report details"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchReport();
+    }
+  }, [id]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <Loader className="h-16 w-16 text-blue-500 animate-spin mb-4" />
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          Loading Report
+        </h2>
+        <p className="text-gray-600 dark:text-gray-400">
+          Please wait while we fetch the report details...
+        </p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !report) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <AlertCircle className="h-16 w-16 text-red-500 mb-4" />
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          Report Not Found
+          {error ? "Error Loading Report" : "Report Not Found"}
         </h2>
         <p className="text-gray-600 dark:text-gray-400 mb-6">
-          The report you're looking for doesn't exist or has been removed.
+          {error ||
+            "The report you're looking for doesn't exist or has been removed."}
         </p>
         <Link
           to="/search"
@@ -263,39 +177,54 @@ axiosClient.get(`/reports/${id}`)
   }
 
   const statusColors = {
-    Verified:
+    verified:
       "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
     "Under Review":
       "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-    Rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+    rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
   };
 
   const riskColors = {
-    Low: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-    Medium:
+    low: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+    medium:
       "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-    High: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
-    Critical: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+    high: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
+    critical: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
   };
 
-  const handleVerify = (isVerified) => {
+  const handleVerify = async (isVerified) => {
     if (!connected) {
       alert("Please connect your wallet to verify this report");
       return;
     }
 
-    // Simulate verification process
-    setVerifyStatus(isVerified ? "verified" : "rejected");
+    try {
+      setVerifyLoading(true);
+      const response = await axiosClient.post(`/reports/${id}/verify/`, {
+        verified: isVerified,
+        comment: verificationInput.trim() || null,
+      });
 
-    // In a real app, you would submit this to the blockchain
-    console.log(
-      `Report ${report.id} ${
-        isVerified ? "verified" : "rejected"
-      }: ${verificationInput}`
-    );
+      setVerifyStatus(isVerified ? "verified" : "rejected");
+      setVerificationInput("");
 
-    // Reset form
-    setVerificationInput("");
+      // Update the report with the new verification
+      if (response.data) {
+        setReport((prev) => ({
+          ...prev,
+          verificationCount: prev.verificationCount + 1,
+          verifications: [response.data, ...prev.verifications],
+        }));
+      }
+    } catch (err) {
+      console.error("Error submitting verification:", err);
+      alert(
+        err.response?.data?.message ||
+          "Failed to submit verification. Please try again."
+      );
+    } finally {
+      setVerifyLoading(false);
+    }
   };
 
   return (
@@ -344,16 +273,18 @@ axiosClient.get(`/reports/${id}`)
               {report.status}
             </span>
             <span
-              className={`text-sm px-3 py-1 rounded-full ${
-                riskColors[report.riskLevel]
+              className={`text-sm px-3 py-1 rounded-full capitalize ${
+                riskColors[report.risk_level]
               }`}
             >
-              {report.riskLevel} Risk
+              {report.risk_level} Risk
             </span>
           </div>
           <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
             <Calendar className="h-4 w-4 mr-1" />
-            <span>Reported on {report.reportDate}</span>
+            <span>
+              Reported on {new Date(report.created_at).toLocaleDateString()}
+            </span>
           </div>
         </div>
         <div className="flex items-center">
@@ -378,7 +309,6 @@ axiosClient.get(`/reports/${id}`)
             <p className="text-gray-700 dark:text-gray-300 mb-4">
               {report.description}
             </p>
-
             {report.url && (
               <div className="flex items-center mb-2">
                 <span className="text-gray-700 dark:text-gray-300 font-medium mr-2">
@@ -395,7 +325,6 @@ axiosClient.get(`/reports/${id}`)
                 </a>
               </div>
             )}
-
             {report.address && (
               <div className="flex items-center">
                 <span className="text-gray-700 dark:text-gray-300 font-medium mr-2">
@@ -409,35 +338,38 @@ axiosClient.get(`/reports/${id}`)
           </div>
 
           {/* Evidence */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Evidence
-            </h2>
-            <div className="space-y-3">
-              {report.evidence.map((item, index) => (
-                <EvidenceItem key={index} evidence={item} />
-              ))}
+          {report.evidence && report.evidence.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                Evidence
+              </h2>
+              <div className="space-y-3">
+                {report.evidence.map((item, index) => (
+                  <EvidenceItem key={index} evidence={item} />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Scam Tactics */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Scam Tactics
-            </h2>
-            <ul className="list-disc pl-5 text-gray-700 dark:text-gray-300 space-y-2">
-              {report.scamTactics.map((tactic, index) => (
-                <li key={index}>{tactic}</li>
-              ))}
-            </ul>
-          </div>
+          {report.scamTactics && report.scamTactics.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                Scam Tactics
+              </h2>
+              <ul className="list-disc pl-5 text-gray-700 dark:text-gray-300 space-y-2">
+                {report.scamTactics.map((tactic, index) => (
+                  <li key={index}>{tactic}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Verification Form */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
               Verify This Report
             </h2>
-
             {verifyStatus ? (
               <div
                 className={`p-4 mb-4 rounded-lg ${
@@ -463,7 +395,6 @@ axiosClient.get(`/reports/${id}`)
                   Have you encountered this scam? Help protect the community by
                   verifying this report.
                 </p>
-
                 <div className="mb-4">
                   <label
                     htmlFor="comment"
@@ -478,29 +409,35 @@ axiosClient.get(`/reports/${id}`)
                     rows="3"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     placeholder="Share your experience or add more details..."
+                    disabled={verifyLoading}
                   ></textarea>
                 </div>
-
                 <div className="flex space-x-4">
                   <button
                     onClick={() => handleVerify(true)}
-                    className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg shadow-sm transition-colors"
-                    disabled={!connected}
+                    className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!connected || verifyLoading}
                   >
-                    <ThumbsUp className="h-4 w-4 mr-2" />
+                    {verifyLoading ? (
+                      <Loader className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <ThumbsUp className="h-4 w-4 mr-2" />
+                    )}
                     Verify Report
                   </button>
-
                   <button
                     onClick={() => handleVerify(false)}
-                    className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg shadow-sm transition-colors"
-                    disabled={!connected}
+                    className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!connected || verifyLoading}
                   >
-                    <ThumbsDown className="h-4 w-4 mr-2" />
+                    {verifyLoading ? (
+                      <Loader className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <ThumbsDown className="h-4 w-4 mr-2" />
+                    )}
                     Reject Report
                   </button>
                 </div>
-
                 {!connected && (
                   <p className="mt-2 text-sm text-yellow-600 dark:text-yellow-400">
                     Connect your wallet to verify this report
@@ -527,40 +464,44 @@ axiosClient.get(`/reports/${id}`)
                   Anonymous
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {report.reportedBy.substring(0, 6)}...
-                  {report.reportedBy.substring(report.reportedBy.length - 4)}
+                  {report.reporter_address?.substring(0, 6)}...
+                  {report.reporter_address?.substring(report.reporter_address.length - 4)}
                 </p>
               </div>
             </div>
           </div>
 
           {/* Timeline */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Timeline
-            </h2>
-            <div className="pt-2">
-              {report.timeline.map((item, index) => (
-                <TimelineItem
-                  key={index}
-                  item={item}
-                  isLast={index === report.timeline.length - 1}
-                />
-              ))}
+          {report.timeline && report.timeline.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                Timeline
+              </h2>
+              <div className="pt-2">
+                {report.timeline.map((item, index) => (
+                  <TimelineItem
+                    key={index}
+                    item={item}
+                    isLast={index === report.timeline.length - 1}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Community Verification */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Community Verification
-            </h2>
-            <div>
-              {report.verifications.map((item, index) => (
-                <VerificationItem key={index} verification={item} />
-              ))}
+          {report.verifications && report.verifications.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                Community Verification
+              </h2>
+              <div>
+                {report.verifications.map((item, index) => (
+                  <VerificationItem key={index} verification={item} />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Share Report */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
@@ -580,7 +521,6 @@ axiosClient.get(`/reports/${id}`)
                   <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z" />
                 </svg>
               </button>
-
               <button className="p-2 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
                 <svg
                   className="h-5 w-5"
@@ -590,7 +530,6 @@ axiosClient.get(`/reports/${id}`)
                   <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
                 </svg>
               </button>
-
               <button className="p-2 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
                 <svg
                   className="h-5 w-5"
@@ -600,7 +539,6 @@ axiosClient.get(`/reports/${id}`)
                   <path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z" />
                 </svg>
               </button>
-
               <button className="p-2 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
                 <svg
                   className="h-5 w-5"
