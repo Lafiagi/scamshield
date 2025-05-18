@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   Search,
@@ -6,99 +6,53 @@ import {
   ExternalLink,
   Shield,
   Clock,
+  Loader2,
 } from "lucide-react";
 import axiosClient from "../utils/apiClient";
 
-// Mock data for demonstration
-const MOCK_REPORTS = [
-  {
-    id: "1",
-    title: "Fake SUI Mining Pool",
-    type: "Website",
-    status: "Verified",
-    riskLevel: "High",
-    reportedBy: "0x1a2b...3c4d",
-    reportDate: "2025-04-28",
-    verificationCount: 12,
-    description:
-      "Website claiming to offer SUI mining services but actually steals user funds.",
-    url: "https://fake-sui-mining.com",
-    address: "0x7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3",
-  },
-  {
-    id: "2",
-    title: "Fraudulent SUI Token Swap",
-    type: "Smart Contract",
-    status: "Under Review",
-    riskLevel: "Medium",
-    reportedBy: "0x5e6f...7g8h",
-    reportDate: "2025-05-01",
-    verificationCount: 5,
-    description:
-      "Smart contract that claims to swap tokens but actually drains user wallets.",
-    url: "",
-    address: "0x1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b",
-  },
-  {
-    id: "3",
-    title: "SUI Airdrop Scam",
-    type: "Social Media",
-    status: "Verified",
-    riskLevel: "High",
-    reportedBy: "0x9i0j...1k2l",
-    reportDate: "2025-04-25",
-    verificationCount: 18,
-    description:
-      "Twitter account impersonating SUI Foundation offering fake airdrops.",
-    url: "https://twitter.com/not_real_sui_foundation",
-    address: "",
-  },
-  {
-    id: "4",
-    title: "Fake SUI Wallet Extension",
-    type: "Application",
-    status: "Verified",
-    riskLevel: "Critical",
-    reportedBy: "0x3m4n...5o6p",
-    reportDate: "2025-04-30",
-    verificationCount: 24,
-    description:
-      "Browser extension that steals private keys from SUI wallet users.",
-    url: "https://chrome-web-store.fake/sui-wallet-scam",
-    address: "",
-  },
-  {
-    id: "5",
-    title: "SUI Token Giveaway Scam",
-    type: "Social Media",
-    status: "Under Review",
-    riskLevel: "Medium",
-    reportedBy: "0x7q8r...9s0t",
-    reportDate: "2025-05-02",
-    verificationCount: 3,
-    description: "Telegram group promising free SUI tokens for sending funds.",
-    url: "https://t.me/fake_sui_giveaway",
-    address: "0x2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c",
-  },
-];
-
-axiosClient.get("/reports/")
-
 const SearchResult = ({ report }) => {
   const statusColors = {
-    Verified:
+    verified:
       "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-    "Under Review":
+    pending:
       "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-    Rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+    rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
   };
 
   const riskColors = {
-    Low: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-    Medium:
+    low: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+    medium:
       "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-    High: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
-    Critical: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+    high: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
+    critical: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+  };
+
+  const formatScamType = (type) => {
+    const typeMap = {
+      website: "Website",
+      smart_contract: "Smart Contract",
+      social_media: "Social Media",
+      application: "Application",
+      phishing: "Phishing",
+    };
+    return typeMap[type] || type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const formatStatus = (status) => {
+    const statusMap = {
+      verified: "Verified",
+      pending: "Under Review",
+      rejected: "Rejected",
+    };
+    return statusMap[status] || status.replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const formatRiskLevel = (risk) => {
+    return risk.replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString();
   };
 
   return (
@@ -110,21 +64,21 @@ const SearchResult = ({ report }) => {
           </h3>
           <div className="flex flex-wrap gap-2 mb-2">
             <span className="px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-              {report.type}
+              {formatScamType(report.scam_type)}
             </span>
             <span
               className={`px-3 py-1 text-xs rounded-full ${
                 statusColors[report.status]
               }`}
             >
-              {report.status}
+              {formatStatus(report.status)}
             </span>
             <span
               className={`px-3 py-1 text-xs rounded-full ${
-                riskColors[report.riskLevel]
+                riskColors[report.risk_level]
               }`}
             >
-              {report.riskLevel} Risk
+              {formatRiskLevel(report.risk_level)} Risk
             </span>
           </div>
         </div>
@@ -137,41 +91,27 @@ const SearchResult = ({ report }) => {
         </Link>
       </div>
 
-      <p className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
-        {report.description}
-      </p>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
-        {report.url && (
-          <div className="flex items-center">
-            <span className="text-gray-500 dark:text-gray-400 text-sm mr-2">
-              URL:
-            </span>
-            <span className="text-gray-700 dark:text-gray-300 text-sm truncate">
-              {report.url}
-            </span>
-          </div>
-        )}
-        {report.address && (
-          <div className="flex items-center">
-            <span className="text-gray-500 dark:text-gray-400 text-sm mr-2">
-              Address:
-            </span>
-            <span className="text-gray-700 dark:text-gray-300 text-sm truncate">
-              {report.address}
-            </span>
-          </div>
-        )}
+        <div className="flex items-center">
+          <span className="text-gray-500 dark:text-gray-400 text-sm mr-2">
+            Reporter:
+          </span>
+          <span className="text-gray-700 dark:text-gray-300 text-sm truncate">
+            {report.reporter_address.slice(0, 6)}...{report.reporter_address.slice(-4)}
+          </span>
+        </div>
       </div>
 
       <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
         <div className="flex items-center">
           <Shield className="h-4 w-4 mr-1" />
-          <span>{report.verificationCount} verifications</span>
+          <span>
+            {report.verification_count} {report.verification_count === 1 ? 'verification' : 'verifications'}
+          </span>
         </div>
         <div className="flex items-center">
           <Clock className="h-4 w-4 mr-1" />
-          <span>Reported {report.reportDate}</span>
+          <span>Reported {formatDate(report.created_at)}</span>
         </div>
       </div>
     </div>
@@ -213,9 +153,10 @@ const FilterSection = ({ filters, setFilters }) => {
           >
             <option value="all">All Types</option>
             <option value="website">Website</option>
-            <option value="smart-contract">Smart Contract</option>
-            <option value="social-media">Social Media</option>
+            <option value="smart_contract">Smart Contract</option>
+            <option value="social_media">Social Media</option>
             <option value="application">Application</option>
+            <option value="phishing">Phishing</option>
           </select>
         </div>
 
@@ -231,7 +172,7 @@ const FilterSection = ({ filters, setFilters }) => {
           >
             <option value="all">All Statuses</option>
             <option value="verified">Verified</option>
-            <option value="under-review">Under Review</option>
+            <option value="pending">Under Review</option>
             <option value="rejected">Rejected</option>
           </select>
         </div>
@@ -287,10 +228,133 @@ const SearchPage = () => {
     riskLevel: "all",
     dateRange: "all",
   });
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [sortBy, setSortBy] = useState("date-desc");
 
-  // For demo purposes, we're just returning all reports
-  // In a real implementation, you'd apply the filters and search
-  const filteredReports = MOCK_REPORTS;
+  // Fetch reports from API
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        setLoading(true);
+        const response = await axiosClient.get("/reports/");
+        setReports(response.data);
+        setError(null);
+      } catch (err) {
+        setError("Failed to fetch reports. Please try again later.");
+        console.error("Error fetching reports:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReports();
+  }, []);
+
+  // Filter and search logic
+  const filteredReports = useMemo(() => {
+    let filtered = reports;
+
+    // Apply search term
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (report) =>
+          report.title.toLowerCase().includes(searchLower) ||
+          report.reporter_address.toLowerCase().includes(searchLower) ||
+          report.scam_type.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply filters
+    if (filters.type !== "all") {
+      filtered = filtered.filter((report) => report.scam_type === filters.type);
+    }
+
+    if (filters.status !== "all") {
+      filtered = filtered.filter((report) => report.status === filters.status);
+    }
+
+    if (filters.riskLevel !== "all") {
+      filtered = filtered.filter((report) => report.risk_level === filters.riskLevel);
+    }
+
+    if (filters.dateRange !== "all") {
+      const now = new Date();
+      const filterDate = new Date();
+      
+      switch (filters.dateRange) {
+        case "day":
+          filterDate.setDate(now.getDate() - 1);
+          break;
+        case "week":
+          filterDate.setDate(now.getDate() - 7);
+          break;
+        case "month":
+          filterDate.setMonth(now.getMonth() - 1);
+          break;
+        default:
+          filterDate = null;
+      }
+
+      if (filterDate) {
+        filtered = filtered.filter(
+          (report) => new Date(report.created_at) >= filterDate
+        );
+      }
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "date-desc":
+          return new Date(b.created_at) - new Date(a.created_at);
+        case "date-asc":
+          return new Date(a.created_at) - new Date(b.created_at);
+        case "risk-desc":
+          const riskOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+          return riskOrder[b.risk_level] - riskOrder[a.risk_level];
+        case "verifications-desc":
+          return b.verification_count - a.verification_count;
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [reports, searchTerm, filters, sortBy]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-96">
+        <div className="flex items-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mr-3" />
+          <span className="text-lg text-gray-600 dark:text-gray-300">
+            Loading reports...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 text-center">
+        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-red-800 dark:text-red-300 mb-2">
+          Error Loading Reports
+        </h3>
+        <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg shadow-md transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -315,7 +379,7 @@ const SearchPage = () => {
             <input
               type="text"
               className="block w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Search by address, URL, or description..."
+              placeholder="Search by title, address, or type..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -343,6 +407,8 @@ const SearchPage = () => {
           </label>
           <select
             id="sort"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
             className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           >
             <option value="date-desc">Newest First</option>
@@ -361,7 +427,7 @@ const SearchPage = () => {
       </div>
 
       {/* No Results */}
-      {filteredReports.length === 0 && (
+      {filteredReports.length === 0 && !loading && (
         <div className="bg-white dark:bg-gray-800 shadow-md rounded-xl p-10 text-center">
           <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">

@@ -65,8 +65,8 @@ const VerificationItem = ({ verification }) => (
           )}
         </div>
         <span className="font-medium text-gray-900 dark:text-white truncate max-w-xs">
-          {verification.verifier.substring(0, 6)}...
-          {verification.verifier.substring(verification.verifier.length - 4)}
+          {verification.verifier?.substring(0, 6)}...
+          {verification.verifier?.substring(verification.verifier.length - 4)}
         </span>
       </div>
       <span className="text-sm text-gray-500 dark:text-gray-400">
