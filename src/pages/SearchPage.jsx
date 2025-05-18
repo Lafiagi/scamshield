@@ -7,6 +7,7 @@ import {
   Shield,
   Clock,
 } from "lucide-react";
+import axiosClient from "../utils/apiClient";
 
 // Mock data for demonstration
 const MOCK_REPORTS = [
@@ -80,6 +81,8 @@ const MOCK_REPORTS = [
     address: "0x2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c",
   },
 ];
+
+axiosClient.get("/reports/")
 
 const SearchResult = ({ report }) => {
   const statusColors = {

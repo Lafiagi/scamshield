@@ -56,6 +56,7 @@ class ScamReportDetailSerializer(serializers.ModelSerializer):
     verifications = VerificationSerializer(many=True, read_only=True)
     scam_tactics = ScamTacticSerializer(many=True, read_only=True)
     timeline = TimelineEventSerializer(many=True, read_only=True)
+    user_can_verify = serializers.SerializerMethodField()
 
     class Meta:
         model = ScamReport
@@ -81,7 +82,23 @@ class ScamReportDetailSerializer(serializers.ModelSerializer):
             "verifications",
             "scam_tactics",
             "timeline",
+            "user_can_verify",
         ]
+
+    def get_user_can_verify(self, obj: ScamReport):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+
+        if not user or not user.is_authenticated:
+            return False
+
+        # Check if this user has already verified this specific report
+        has_verified = Verification.objects.filter(verifier=user, report=obj).exists()
+
+        # User cannot verify their own report
+        is_reporter = obj.reporter_address == getattr(user, "wallet_address", None)
+
+        return not has_verified and not is_reporter
 
 
 class ScamReportCreateSerializer(serializers.ModelSerializer):
