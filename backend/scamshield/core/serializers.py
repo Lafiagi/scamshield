@@ -96,6 +96,7 @@ class ScamReportCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ScamReport
         fields = [
+            "id",
             "title",
             "scammer_address",
             "scam_type",
@@ -106,6 +107,7 @@ class ScamReportCreateSerializer(serializers.ModelSerializer):
             "transaction_hash",
             "sui_object_id",
             "stake_amount",
+            "transaction_amount",
         ]
 
     def create(self, validated_data):
