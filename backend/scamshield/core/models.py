@@ -37,7 +37,7 @@ class ScamReport(models.Model):
     description = models.TextField()
     contact_info = models.CharField(max_length=255, blank=True, null=True)
     additional_details = models.TextField(blank=True, null=True)
-
+    transaction_amount = models.DecimalField(max_digits=20, decimal_places=2, default=0.0)
     # Status and metadata
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     risk_level = models.CharField(

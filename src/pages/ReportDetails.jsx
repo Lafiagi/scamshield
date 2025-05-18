@@ -17,6 +17,7 @@ import {
   Info,
   Code,
 } from "lucide-react";
+import axiosClient from "../utils/apiClient";
 
 // Mock data for demonstration
 const MOCK_REPORTS = {
@@ -240,7 +241,7 @@ const ReportDetails = () => {
   const report = MOCK_REPORTS[id];
   const [verificationInput, setVerificationInput] = useState("");
   const [verifyStatus, setVerifyStatus] = useState(null);
-
+axiosClient.get(`/reports/${id}`)
   if (!report) {
     return (
       <div className="flex flex-col items-center justify-center py-12">

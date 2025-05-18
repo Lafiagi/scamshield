@@ -1,4 +1,3 @@
-// src/pages/ReportForm.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@suiet/wallet-kit";
@@ -12,18 +11,7 @@ import {
   ChevronRight,
   ChevronLeft,
 } from "lucide-react";
-
-// Mock submission function - in a real implementation, this would interact with the SUI blockchain
-const submitReport = async (reportData) => {
-  // Simulate blockchain interaction delay
-  await new Promise((resolve) => setTimeout(resolve, 1500));
-
-  // For demo purposes, always succeed
-  return {
-    success: true,
-    reportId: "report_" + Math.random().toString(36).substring(2, 15),
-  };
-};
+import axiosClient from "../utils/apiClient";
 
 const ReportForm = () => {
   const navigate = useNavigate();
@@ -32,27 +20,33 @@ const ReportForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [stakeAmount, setStakeAmount] = useState(10); // Default stake amount
 
-  // Form state
+  // Form state - matching backend fields
   const [formData, setFormData] = useState({
-    scammerAddress: "",
-    scamType: "",
+    title: "",
+    scammer_address: "",
+    scam_type: "",
     description: "",
-    evidenceFiles: [],
-    contactInfo: "",
-    additionalDetails: "",
+    evidence_files: [],
+    contact_info: "",
+    additional_details: "",
+    transaction_hash: "", // Optional, for blockchain integration
+    sui_object_id: "", // Will be set after blockchain interaction
+    stake_amount: 10,
+    transaction_amount: null,
   });
 
   // Validation state
   const [errors, setErrors] = useState({});
 
   const scamTypes = [
+    { value: "website", label: "Malicious Website" },
+    { value: "wallet", label: "Wallet Drainer" },
+    { value: "social_media", label: "Social Media Scam" },
+    { value: "smart_contract", label: "Malicious Smart Contract" },
+    { value: "airdrop", label: "Fake Airdrop" },
+    { value: "impersonation", label: "Account Impersonation" },
     { value: "phishing", label: "Phishing Attack" },
     { value: "fake_token", label: "Fake Token" },
-    { value: "impersonation", label: "Account Impersonation" },
-    { value: "malicious_contract", label: "Malicious Smart Contract" },
-    { value: "ponzi", label: "Ponzi/Pyramid Scheme" },
-    { value: "rugpull", label: "Rug Pull" },
-    { value: "wallet_drain", label: "Wallet Drainer" },
     { value: "other", label: "Other Scam" },
   ];
 
@@ -76,23 +70,23 @@ const ReportForm = () => {
     const files = Array.from(e.target.files);
     setFormData({
       ...formData,
-      evidenceFiles: [...formData.evidenceFiles, ...files],
+      evidence_files: [...formData.evidence_files, ...files],
     });
 
-    if (errors.evidenceFiles) {
+    if (errors.evidence_files) {
       setErrors({
         ...errors,
-        evidenceFiles: "",
+        evidence_files: "",
       });
     }
   };
 
   const removeFile = (index) => {
-    const updatedFiles = [...formData.evidenceFiles];
+    const updatedFiles = [...formData.evidence_files];
     updatedFiles.splice(index, 1);
     setFormData({
       ...formData,
-      evidenceFiles: updatedFiles,
+      evidence_files: updatedFiles,
     });
   };
 
@@ -100,14 +94,18 @@ const ReportForm = () => {
     const newErrors = {};
 
     if (step === 1) {
-      if (!formData.scammerAddress.trim()) {
-        newErrors.scammerAddress = "Scammer address is required";
-      } else if (!/^0x[a-fA-F0-9]{64}$/.test(formData.scammerAddress)) {
-        newErrors.scammerAddress = "Please enter a valid SUI address";
+      if (!formData.title.trim()) {
+        newErrors.title = "Report title is required";
       }
 
-      if (!formData.scamType) {
-        newErrors.scamType = "Please select a scam type";
+      if (!formData.scammer_address.trim()) {
+        newErrors.scammer_address = "Scammer address is required";
+      } else if (!/^0x[a-fA-F0-9]{64}$/.test(formData.scammer_address)) {
+        newErrors.scammer_address = "Please enter a valid SUI address";
+      }
+
+      if (!formData.scam_type) {
+        newErrors.scam_type = "Please select a scam type";
       }
 
       if (!formData.description.trim()) {
@@ -118,8 +116,17 @@ const ReportForm = () => {
     }
 
     if (step === 2) {
-      if (formData.evidenceFiles.length === 0) {
-        newErrors.evidenceFiles = "At least one piece of evidence is required";
+      if (formData.evidence_files.length === 0) {
+        newErrors.evidence_files = "At least one piece of evidence is required";
+      }
+
+      // Validate file sizes (max 10MB per file)
+      const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+      for (const file of formData.evidence_files) {
+        if (file.size > maxSize) {
+          newErrors.evidence_files = `File "${file.name}" is too large. Maximum size is 10MB.`;
+          break;
+        }
       }
     }
 
@@ -146,33 +153,87 @@ const ReportForm = () => {
       return;
     }
 
+    if (!account?.address) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // In a real implementation, you would:
-      // 1. Upload evidence files to IPFS or other storage
-      // 2. Call the SUI contract to submit the report with evidence hashes
-      // 3. Handle staking the required amount
+      // Prepare FormData for multipart upload
+      const submitData = new FormData();
 
-      const result = await submitReport({
-        ...formData,
-        reporterAddress: account.address,
-        stakeAmount,
-        timestamp: new Date().toISOString(),
-        evidenceHashes: formData.evidenceFiles.map(
-          () => `0x${Math.random().toString(16).substring(2, 66)}`
-        ),
+      // Add text fields
+      submitData.append("title", formData.title);
+      submitData.append("scammer_address", formData.scammer_address);
+      submitData.append("scam_type", formData.scam_type);
+      submitData.append("description", formData.description);
+      submitData.append("stake_amount", stakeAmount);
+      submitData.append("transaction_amount", formData.transaction_amount);
+
+      // Add optional fields if they exist
+      if (formData.contact_info.trim()) {
+        submitData.append("contact_info", formData.contact_info);
+      }
+
+      if (formData.additional_details.trim()) {
+        submitData.append("additional_details", formData.additional_details);
+      }
+
+      if (formData.transaction_hash.trim()) {
+        submitData.append("transaction_hash", formData.transaction_hash);
+      }
+
+      if (formData.sui_object_id.trim()) {
+        submitData.append("sui_object_id", formData.sui_object_id);
+      }
+
+      // Add evidence files
+      formData.evidence_files.forEach((file, index) => {
+        submitData.append("evidence_files", file);
       });
 
-      if (result.success) {
+      // TODO: In a real implementation, you would:
+      // 1. First interact with the SUI blockchain to stake tokens
+      // 2. Get the transaction hash and SUI object ID from the blockchain
+      // 3. Then submit to the backend with these values
+
+      // For now, we'll submit without blockchain interaction
+      const response = await axiosClient.post("/reports/", submitData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      if (response.status === 201) {
         toast.success("Report submitted successfully!");
-        navigate(`/reports/${result.reportId}`);
+        navigate(`/reports/${response.data.id}`);
       } else {
         toast.error("Failed to submit report. Please try again.");
       }
     } catch (error) {
       console.error("Error submitting report:", error);
-      toast.error("An error occurred. Please try again later.");
+
+      if (error.response?.data) {
+        // Handle validation errors from backend
+        const backendErrors = error.response.data;
+        if (typeof backendErrors === "object") {
+          const errorMessages = Object.entries(backendErrors)
+            .map(
+              ([field, messages]) =>
+                `${field}: ${
+                  Array.isArray(messages) ? messages.join(", ") : messages
+                }`
+            )
+            .join("\n");
+          toast.error(`Validation errors:\n${errorMessages}`);
+        } else {
+          toast.error(backendErrors.detail || "Failed to submit report");
+        }
+      } else {
+        toast.error("An error occurred. Please try again later.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -265,27 +326,27 @@ const ReportForm = () => {
             <div>
               <label
                 className="block text-gray-700 dark:text-gray-300 font-medium mb-2"
-                htmlFor="scammerAddress"
+                htmlFor="title"
               >
-                Scammer's Wallet Address <span className="text-red-500">*</span>
+                Report Title <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                id="scammerAddress"
-                name="scammerAddress"
-                value={formData.scammerAddress}
+                id="title"
+                name="title"
+                value={formData.title}
                 onChange={handleInputChange}
-                placeholder="0x..."
+                placeholder="Brief title describing the scam"
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
-                  errors.scammerAddress
+                  errors.title
                     ? "border-red-500 dark:border-red-500"
                     : "border-gray-300 dark:border-gray-600"
                 }`}
               />
-              {errors.scammerAddress && (
+              {errors.title && (
                 <p className="mt-1 text-sm text-red-500 flex items-center">
                   <AlertCircle className="h-4 w-4 mr-1" />
-                  {errors.scammerAddress}
+                  {errors.title}
                 </p>
               )}
             </div>
@@ -293,17 +354,45 @@ const ReportForm = () => {
             <div>
               <label
                 className="block text-gray-700 dark:text-gray-300 font-medium mb-2"
-                htmlFor="scamType"
+                htmlFor="scammer_address"
+              >
+                Scammer's Wallet Address <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="scammer_address"
+                name="scammer_address"
+                value={formData.scammer_address}
+                onChange={handleInputChange}
+                placeholder="0x..."
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
+                  errors.scammer_address
+                    ? "border-red-500 dark:border-red-500"
+                    : "border-gray-300 dark:border-gray-600"
+                }`}
+              />
+              {errors.scammer_address && (
+                <p className="mt-1 text-sm text-red-500 flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  {errors.scammer_address}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label
+                className="block text-gray-700 dark:text-gray-300 font-medium mb-2"
+                htmlFor="scam_type"
               >
                 Scam Type <span className="text-red-500">*</span>
               </label>
               <select
-                id="scamType"
-                name="scamType"
-                value={formData.scamType}
+                id="scam_type"
+                name="scam_type"
+                value={formData.scam_type}
                 onChange={handleInputChange}
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
-                  errors.scamType
+                  errors.scam_type
                     ? "border-red-500 dark:border-red-500"
                     : "border-gray-300 dark:border-gray-600"
                 }`}
@@ -315,10 +404,10 @@ const ReportForm = () => {
                   </option>
                 ))}
               </select>
-              {errors.scamType && (
+              {errors.scam_type && (
                 <p className="mt-1 text-sm text-red-500 flex items-center">
                   <AlertCircle className="h-4 w-4 mr-1" />
-                  {errors.scamType}
+                  {errors.scam_type}
                 </p>
               )}
             </div>
@@ -354,15 +443,15 @@ const ReportForm = () => {
             <div>
               <label
                 className="block text-gray-700 dark:text-gray-300 font-medium mb-2"
-                htmlFor="contactInfo"
+                htmlFor="contact_info"
               >
                 Scammer's Contact Information (Optional)
               </label>
               <input
                 type="text"
-                id="contactInfo"
-                name="contactInfo"
-                value={formData.contactInfo}
+                id="contact_info"
+                name="contact_info"
+                value={formData.contact_info}
                 onChange={handleInputChange}
                 placeholder="Email, social media handles, website, etc."
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
@@ -370,6 +459,28 @@ const ReportForm = () => {
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 flex items-center">
                 <Info className="h-4 w-4 mr-1" />
                 This helps others identify the scammer across platforms
+              </p>
+            </div>
+
+            <div>
+              <label
+                className="block text-gray-700 dark:text-gray-300 font-medium mb-2"
+                htmlFor="transaction_hash"
+              >
+                Related Transaction Hash (Optional)
+              </label>
+              <input
+                type="text"
+                id="transaction_hash"
+                name="transaction_hash"
+                value={formData.transaction_hash}
+                onChange={handleInputChange}
+                placeholder="0x..."
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                <Info className="h-4 w-4 mr-1" />
+                Transaction hash related to the scam (if applicable)
               </p>
             </div>
 
@@ -394,7 +505,7 @@ const ReportForm = () => {
               </label>
               <div
                 className={`border-2 border-dashed rounded-lg p-6 text-center ${
-                  errors.evidenceFiles
+                  errors.evidence_files
                     ? "border-red-500 dark:border-red-500"
                     : "border-gray-300 dark:border-gray-600"
                 }`}
@@ -413,6 +524,7 @@ const ReportForm = () => {
                     name="evidenceFiles"
                     onChange={handleFileChange}
                     multiple
+                    accept=".png,.jpg,.jpeg,.pdf,.txt,.doc,.docx"
                     className="hidden"
                   />
                   <label
@@ -423,20 +535,20 @@ const ReportForm = () => {
                   </label>
                 </div>
               </div>
-              {errors.evidenceFiles && (
+              {errors.evidence_files && (
                 <p className="mt-1 text-sm text-red-500 flex items-center">
                   <AlertCircle className="h-4 w-4 mr-1" />
-                  {errors.evidenceFiles}
+                  {errors.evidence_files}
                 </p>
               )}
 
-              {formData.evidenceFiles.length > 0 && (
+              {formData.evidence_files.length > 0 && (
                 <div className="mt-4">
                   <h4 className="text-gray-700 dark:text-gray-300 font-medium mb-2">
-                    Uploaded Files ({formData.evidenceFiles.length})
+                    Uploaded Files ({formData.evidence_files.length})
                   </h4>
                   <ul className="space-y-2">
-                    {formData.evidenceFiles.map((file, index) => (
+                    {formData.evidence_files.map((file, index) => (
                       <li
                         key={index}
                         className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 rounded-lg px-4 py-2"
@@ -444,7 +556,7 @@ const ReportForm = () => {
                         <div className="flex items-center">
                           <span className="truncate max-w-md">{file.name}</span>
                           <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
-                            ({(file.size / 1024).toFixed(1)} KB)
+                            ({(file.size / 1024 / 1024).toFixed(2)} MB)
                           </span>
                         </div>
                         <button
@@ -464,14 +576,14 @@ const ReportForm = () => {
             <div>
               <label
                 className="block text-gray-700 dark:text-gray-300 font-medium mb-2"
-                htmlFor="additionalDetails"
+                htmlFor="additional_details"
               >
                 Additional Evidence Details (Optional)
               </label>
               <textarea
-                id="additionalDetails"
-                name="additionalDetails"
-                value={formData.additionalDetails}
+                id="additional_details"
+                name="additional_details"
+                value={formData.additional_details}
                 onChange={handleInputChange}
                 rows="3"
                 placeholder="Explain what each piece of evidence shows or any additional context..."
@@ -521,19 +633,26 @@ const ReportForm = () => {
             <div>
               <label
                 className="block text-gray-700 dark:text-gray-300 font-medium mb-2"
-                htmlFor="stakeAmount"
+                htmlFor="stakeAmountRange"
               >
                 Stake Amount (SUI)
               </label>
               <div className="flex items-center">
                 <input
                   type="range"
-                  id="stakeAmount"
+                  id="stakeAmountRange"
                   min="10"
                   max="100"
                   step="10"
                   value={stakeAmount}
-                  onChange={(e) => setStakeAmount(parseInt(e.target.value))}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    setStakeAmount(value);
+                    setFormData({
+                      ...formData,
+                      stake_amount: value,
+                    });
+                  }}
                   className="w-full mr-4"
                 />
                 <span className="text-gray-900 dark:text-white font-bold text-xl min-w-[60px]">
@@ -545,6 +664,34 @@ const ReportForm = () => {
                 verification.
               </p>
             </div>
+            <div>
+              <label
+                className="block text-gray-700 dark:text-gray-300 font-medium mb-2"
+                htmlFor="stakeAmountRange"
+              >
+                Transaction Amount (USD)
+              </label>
+              <div className="flex items-center">
+                <input
+                  type="number"
+                  id="transactionAmount"
+                  step="any"
+                  value={formData.transaction_amount}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    // setStakeAmount(value);
+                    setFormData({
+                      ...formData,
+                      transaction_amount: value,
+                    });
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                The exact amount involved in the transaction
+              </p>
+            </div>
 
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 mt-8">
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
@@ -554,10 +701,19 @@ const ReportForm = () => {
               <div className="space-y-4">
                 <div className="flex flex-col">
                   <span className="text-sm text-gray-500 dark:text-gray-400">
+                    Title
+                  </span>
+                  <span className="text-gray-900 dark:text-white">
+                    {formData.title}
+                  </span>
+                </div>
+
+                <div className="flex flex-col">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
                     Scammer Address
                   </span>
                   <span className="text-gray-900 dark:text-white font-mono break-all">
-                    {formData.scammerAddress}
+                    {formData.scammer_address}
                   </span>
                 </div>
 
@@ -566,8 +722,8 @@ const ReportForm = () => {
                     Scam Type
                   </span>
                   <span className="text-gray-900 dark:text-white">
-                    {scamTypes.find((type) => type.value === formData.scamType)
-                      ?.label || formData.scamType}
+                    {scamTypes.find((type) => type.value === formData.scam_type)
+                      ?.label || formData.scam_type}
                   </span>
                 </div>
 
@@ -580,13 +736,24 @@ const ReportForm = () => {
                   </span>
                 </div>
 
-                {formData.contactInfo && (
+                {formData.contact_info && (
                   <div className="flex flex-col">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
                       Scammer's Contact Info
                     </span>
                     <span className="text-gray-900 dark:text-white">
-                      {formData.contactInfo}
+                      {formData.contact_info}
+                    </span>
+                  </div>
+                )}
+
+                {formData.transaction_hash && (
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Transaction Hash
+                    </span>
+                    <span className="text-gray-900 dark:text-white font-mono break-all">
+                      {formData.transaction_hash}
                     </span>
                   </div>
                 )}
@@ -596,17 +763,17 @@ const ReportForm = () => {
                     Evidence Files
                   </span>
                   <span className="text-gray-900 dark:text-white">
-                    {formData.evidenceFiles.length} files uploaded
+                    {formData.evidence_files.length} files uploaded
                   </span>
                 </div>
 
-                {formData.additionalDetails && (
+                {formData.additional_details && (
                   <div className="flex flex-col">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
                       Additional Evidence Details
                     </span>
                     <span className="text-gray-900 dark:text-white">
-                      {formData.additionalDetails}
+                      {formData.additional_details}
                     </span>
                   </div>
                 )}
@@ -616,7 +783,7 @@ const ReportForm = () => {
                     Reporter Address
                   </span>
                   <span className="text-gray-900 dark:text-white font-mono break-all">
-                    {account.address}
+                    {account?.address || "Not connected"}
                   </span>
                 </div>
 
@@ -626,6 +793,15 @@ const ReportForm = () => {
                   </span>
                   <span className="text-gray-900 dark:text-white font-bold">
                     {stakeAmount} SUI
+                  </span>
+                </div>
+
+                <div className="flex flex-col">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    Transaction Amount
+                  </span>
+                  <span className="text-gray-900 dark:text-white font-bold">
+                    {formData.transaction_amount} USD
                   </span>
                 </div>
               </div>
@@ -642,7 +818,7 @@ const ReportForm = () => {
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !account?.address}
                 className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
@@ -667,7 +843,7 @@ const ReportForm = () => {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
-                    Submitting...
+                    Submitting Report...
                   </>
                 ) : (
                   <>
@@ -683,5 +859,4 @@ const ReportForm = () => {
     </div>
   );
 };
-
 export default ReportForm;

@@ -1,8 +1,9 @@
 from rest_framework import viewsets, permissions, status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import Q, Sum
 
 from .models import ScamReport, Evidence, Verification, ScamTactic, TimelineEvent
 from .serializers import (
@@ -12,6 +13,7 @@ from .serializers import (
     VerificationCreateSerializer,
     EvidenceSerializer,
 )
+
 
 class ScamReportViewSet(viewsets.ModelViewSet):
     """
@@ -185,3 +187,55 @@ class PendingVerificationsView(generics.ListAPIView):
             )
             .order_by("-created_at")
         )
+
+
+class DashboardStatsView(APIView):
+    """
+    Get statistics for the dashboard.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        # Total reports
+        total_reports = ScamReport.objects.count()
+        most_recent_reports = ScamReport.objects.all().order_by("-created_at")[:3]
+        # Active verifiers (unique verifiers in the last 30 days)
+        thirty_days_ago = timezone.now() - timezone.timedelta(days=60)
+        active_verifiers = (
+            ScamReport.objects.filter(verifications__timestamp__gte=thirty_days_ago)
+            .values("verifications__verifier")
+            .distinct()
+            .count()
+        )
+
+        # Protected wallets (unique reporters + unique verifiers)
+        reporters = ScamReport.objects.values("reporter_address").distinct().count()
+        verifiers = (
+            ScamReport.objects.values("verifications__verifier").distinct().count()
+        )
+        protected_wallets = reporters + verifiers
+
+        prevented_value_sui = (
+            ScamReport.objects.filter(status="verified").aggregate(
+                total=Sum("transaction_amount")
+            )["total"]
+            or 0
+        )
+        prevented_value_usd = prevented_value_sui
+
+        stats = {
+            "totalReports": total_reports,
+            "activeVerifiers": active_verifiers,
+            "protectedWallets": protected_wallets,
+            "preventedValue": (
+                f"${prevented_value_usd/1000000:.1f}M"
+                if prevented_value_usd >= 1000000
+                else f"${prevented_value_usd:.0f}"
+            ),
+            "recentReports": ScamReportListSerializer(
+                most_recent_reports, many=True
+            ).data,
+        }
+
+        return Response(stats)

@@ -9,6 +9,7 @@ import {
   TrendingUp,
   Database,
 } from "lucide-react";
+import { setWalletAddress } from "../utils/apiClient";
 
 const StatsCard = ({ icon: Icon, title, value, description }) => (
   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 flex flex-col">
@@ -40,8 +41,8 @@ const FeatureCard = ({ icon: Icon, title, description }) => (
 );
 
 const LandingPage = () => {
-  const { connected } = useWallet();
-
+  const { connected, address } = useWallet();
+  if (connected) setWalletAddress(address);
   return (
     <div className="space-y-16 pb-10">
       {/* Hero Section */}
