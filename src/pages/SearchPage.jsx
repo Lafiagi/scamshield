@@ -263,6 +263,7 @@ const SearchPage = () => {
         (report) =>
           report.title.toLowerCase().includes(searchLower) ||
           report.reporter_address.toLowerCase().includes(searchLower) ||
+          report.scammer_address.toLowerCase().includes(searchLower) ||
           report.scam_type.toLowerCase().includes(searchLower)
       );
     }
@@ -282,7 +283,7 @@ const SearchPage = () => {
 
     if (filters.dateRange !== "all") {
       const now = new Date();
-      const filterDate = new Date();
+      let filterDate = new Date();
       
       switch (filters.dateRange) {
         case "day":

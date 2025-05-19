@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ConnectButton, useWallet } from "@suiet/wallet-kit";
+import { ConnectButton } from "@suiet/wallet-kit";
 import {
   Shield,
   Search,
@@ -9,7 +9,8 @@ import {
   TrendingUp,
   Database,
 } from "lucide-react";
-import { setWalletAddress } from "../utils/apiClient";
+import { useWalletStore } from "../stores/walletStore";
+// import { setWalletAddress } from "../utils/apiClient";
 
 const StatsCard = ({ icon: Icon, title, value, description }) => (
   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 flex flex-col">
@@ -41,8 +42,7 @@ const FeatureCard = ({ icon: Icon, title, description }) => (
 );
 
 const LandingPage = () => {
-  const { connected, address } = useWallet();
-  if (connected) setWalletAddress(address);
+  const { clearWallet, isConnected } = useWalletStore();
   return (
     <div className="space-y-16 pb-10">
       {/* Hero Section */}
@@ -62,7 +62,7 @@ const LandingPage = () => {
               ecosystem.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              {connected ? (
+              {isConnected() ? (
                 <Link
                   to="/dashboard"
                   className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md transition-colors"
@@ -71,7 +71,7 @@ const LandingPage = () => {
                 </Link>
               ) : (
                 <div className="scale-110">
-                  <ConnectButton />
+                  <ConnectButton onDisconnectSuccess={() => clearWallet()} />
                 </div>
               )}
               <Link
@@ -306,7 +306,7 @@ const LandingPage = () => {
               protect the SUI community.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              {connected ? (
+              {isConnected() ? (
                 <Link
                   to="/dashboard"
                   className="px-8 py-3 bg-white hover:bg-gray-100 text-blue-600 font-medium rounded-lg shadow-md transition-colors"
@@ -315,7 +315,7 @@ const LandingPage = () => {
                 </Link>
               ) : (
                 <div className="scale-110">
-                  <ConnectButton />
+                  <ConnectButton onDisconnectSuccess={() => clearWallet()} />
                 </div>
               )}
               <Link

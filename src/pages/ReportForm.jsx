@@ -12,11 +12,24 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import axiosClient from "../utils/apiClient";
+import { Transaction } from "@mysten/sui/transactions";
+import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
+import { MIST_PER_SUI } from "@mysten/sui/utils";
 
+import { getFaucetHost, requestSuiFromFaucetV2 } from "@mysten/sui/faucet";
+
+// get tokens from the Devnet faucet server
+// const result = await requestSuiFromFaucetV2({
+//   // connect to Devnet
+//   host: getFaucetHost("testnet"),
+//   recipient: "0xd9a9598b9b6cbf1f0c4182e8c016f8339cd66b43bc7afb96c4ea1d9cee74c3bb",
+// });
+// console.log("Got SUI from faucet", result);
 const ReportForm = () => {
   const navigate = useNavigate();
-  const { account } = useWallet();
+  const { account, signAndExecuteTransaction } = useWallet();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isBlockchainSubmitting, setIsBlockchainSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [stakeAmount, setStakeAmount] = useState(10); // Default stake amount
 
@@ -49,6 +62,128 @@ const ReportForm = () => {
     { value: "fake_token", label: "Fake Token" },
     { value: "other", label: "Other Scam" },
   ];
+
+  const SMART_CONTRACT_CONFIG = {
+    PACKAGE_ID: import.meta.env.VITE_PACKAGE_ID,
+    REGISTRY_OBJECT_ID: import.meta.env.VITE_REGISTRY_OBJECT_ID,
+    CLOCK_OBJECT_ID: "0x6",
+    MIN_STAKE_AMOUNT: 10,
+  };
+  const suiClient = new SuiClient({ url: getFullnodeUrl("devnet") });
+
+  const calculateFileHash = async (file) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest("SHA-256", arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    return hashHex;
+  };
+
+  const submitToBlockchain = async () => {
+    if (!account?.address) {
+      throw new Error("Wallet not connected");
+    }
+
+    setIsBlockchainSubmitting(true);
+
+    try {
+      const suiAmountInMist = Math.round(
+        Number(stakeAmount) * 1_000_000_000
+      ).toString();
+
+      const tx = new Transaction();
+      const [stakeCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(suiAmountInMist)]);
+
+      // Prepare arguments for smart contract
+      const args = [
+        tx.object(SMART_CONTRACT_CONFIG.REGISTRY_OBJECT_ID), // registry
+        tx.object(SMART_CONTRACT_CONFIG.CLOCK_OBJECT_ID), // clock
+        tx.pure.address(formData.scammer_address), // scammer_address
+        tx.pure.string(formData.scam_type), // scam_type
+        tx.pure.string(formData.description), // description
+        tx.pure.string(formData.contact_info || ""), // contact_info
+        tx.pure.string(formData.additional_details || ""), // additional_details
+        stakeCoin, // payment
+      ];
+
+      // Call smart contract function
+      tx.moveCall({
+        target: `${SMART_CONTRACT_CONFIG.PACKAGE_ID}::report_registry::submit_report`,
+        arguments: args,
+      });
+
+      // Sign and execute transaction
+      const result = await signAndExecuteTransaction({
+        transaction: tx,
+        options: {
+          showEffects: true,
+          showEvents: true,
+          showObjectChanges: true,
+        },
+      });
+
+      if (!result?.digest) {
+        throw new Error("Transaction failed");
+      }
+      console.log("Transaction result:", JSON.stringify(result));
+      // Extract report object ID from object changes
+      let reportObjectId = null;
+      if (result.objectChanges) {
+        // Your existing logic
+        for (const change of result.objectChanges) {
+          if (
+            change.type === "created" &&
+            change.objectType?.includes("Report")
+          ) {
+            reportObjectId = change.objectId;
+            break;
+          }
+        }
+      } else if (result.digest) {
+        // Fetch transaction details to get object changes
+        try {
+          const txDetails = await suiClient.getTransactionBlock({
+            digest: result.digest,
+            options: {
+              showObjectChanges: true,
+            },
+          });
+
+          if (txDetails.objectChanges) {
+            for (const change of txDetails.objectChanges) {
+              if (
+                change.type === "created" &&
+                change.objectType?.includes("Report")
+              ) {
+                reportObjectId = change.objectId;
+                break;
+              }
+            }
+          }
+        } catch (fetchError) {
+          console.warn("Could not fetch transaction details:", fetchError);
+        }
+      }
+
+      // Update form data with blockchain transaction details
+      setFormData((prev) => ({
+        ...prev,
+        transaction_hash: result.digest,
+        sui_object_id: reportObjectId || "",
+      }));
+
+      toast.success("Report submitted to blockchain successfully!");
+      return result?.digest;
+    } catch (error) {
+      console.error("Blockchain submission error:", error);
+      toast.error(`Blockchain submission failed: ${error.message}`);
+      throw error;
+    } finally {
+      setIsBlockchainSubmitting(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -198,7 +333,8 @@ const ReportForm = () => {
       // 1. First interact with the SUI blockchain to stake tokens
       // 2. Get the transaction hash and SUI object ID from the blockchain
       // 3. Then submit to the backend with these values
-
+      const result = await submitToBlockchain();
+      submitData.append("transaction_digest", result);
       // For now, we'll submit without blockchain interaction
       const response = await axiosClient.post("/reports/", submitData, {
         headers: {
@@ -641,9 +777,9 @@ const ReportForm = () => {
                 <input
                   type="range"
                   id="stakeAmountRange"
-                  min="10"
+                  min="0.1"
                   max="100"
-                  step="10"
+                  step="0.1"
                   value={stakeAmount}
                   onChange={(e) => {
                     const value = parseInt(e.target.value);

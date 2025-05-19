@@ -48,6 +48,7 @@ class ScamReport(models.Model):
 
     # On-chain data
     transaction_hash = models.CharField(max_length=255, blank=True, null=True)
+    transaction_digest = models.CharField(max_length=255, blank=True, null=True)
     sui_object_id = models.CharField(max_length=255, blank=True, null=True)
     stake_amount = models.BigIntegerField(default=0)
 
