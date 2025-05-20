@@ -1,3 +1,4 @@
+import requests
 from rest_framework import viewsets, permissions, status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -12,8 +13,10 @@ from .serializers import (
     ScamReportCreateSerializer,
     VerificationCreateSerializer,
     EvidenceSerializer,
+    VerifyTransactionSerializer
 )
 
+SUI_RPC_URL = "https://fullnode.testnet.sui.io:443"
 
 class ScamReportViewSet(viewsets.ModelViewSet):
     """
@@ -239,3 +242,95 @@ class DashboardStatsView(APIView):
         }
 
         return Response(stats)
+
+
+
+
+
+
+
+
+
+
+class VerifyTransactionView(APIView):
+    permission_classes = [permissions.AllowAny]
+    serializer_class = VerifyTransactionSerializer
+
+    def post(self, request):
+        tx_digest = request.data.get("transaction_hash")
+        if not tx_digest:
+            return Response({"error": "Missing transaction digest"}, status=400)
+
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "sui_getTransactionBlock",
+            "params": [
+                tx_digest,
+                {
+                    "showInput": True,
+                    "showEffects": True,
+                    "showEvents": True,
+                    "showObjectChanges": True,
+                    "showBalanceChanges": True,
+                },
+            ],
+        }
+
+        try:
+            res = requests.post(SUI_RPC_URL, json=payload)
+            result = res.json()
+
+            if "error" in result:
+                return Response(
+                    {"verified": False, "error": result["error"]}, status=400
+                )
+
+            tx_result = result.get("result", {})
+            status_text = tx_result.get("effects", {}).get("status", {}).get("status")
+
+            if status_text != "success":
+                return Response(
+                    {"verified": False, "message": "Transaction failed or not found"}
+                )
+
+            sender = tx_result.get("transaction", {}).get("data", {}).get("sender")
+            transaction_inputs = (
+                tx_result.get("transaction", {})
+                .get("data", {})
+                .get("transaction", {})
+                .get("inputs", [])
+            )
+
+            # Optional reference_id logic (from string-type inputs)
+            reference_id = None
+            for txn_input in transaction_inputs:
+                if (
+                    txn_input.get("type") == "pure"
+                    and txn_input.get("valueType", "").endswith("String")
+                ):
+                    value = txn_input.get("value", "")
+                    if value.startswith("cs_") or value.startswith("ref_"):
+                        reference_id = value
+                        break
+
+            # ✅ Extract created object ID from objectChanges
+            object_changes = tx_result.get("objectChanges", [])
+            created_object_id = None
+            for change in object_changes:
+                if change.get("type") == "created":
+                    created_object_id = change.get("objectId")
+                    break
+
+            return Response(
+                {
+                    "verified": True,
+                    "message": "Transaction verified successfully",
+                    "sender": sender,
+                    "reference_id": reference_id,
+                    "object_id": created_object_id,
+                }
+            )
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)

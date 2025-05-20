@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useWallet } from "@suiet/wallet-kit";
-import axios from "axios";
+import { ConnectButton } from "@suiet/wallet-kit";
 import {
   Shield,
   AlertCircle,
   FileText,
-  ExternalLink,
   Clock,
   Check,
   X,
@@ -16,60 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import axiosClient from "../utils/apiClient";
-
-// Define API base URL - adjust this based on your environment setup
-const API_BASE_URL = import.meta.env.VITE_API_URL;
-console.log(API_BASE_URL);
-// Mock data for reports (these will be replaced with API data in a real implementation)
-const MOCK_USER_REPORTS = [
-  {
-    id: "1",
-    title: "Phishing Website Impersonating SUI Wallet",
-    type: "Website",
-    reportDate: "2025-04-30",
-    status: "Confirmed",
-    currentVerifications: 12,
-    requiredVerifications: 10,
-    rewardTokens: 45,
-  },
-  {
-    id: "3",
-    title: "Fake SUI Airdrop Twitter Account",
-    type: "Social Media",
-    reportDate: "2025-05-02",
-    status: "Pending",
-    currentVerifications: 4,
-    requiredVerifications: 10,
-    rewardTokens: 0,
-  },
-];
-
-const MOCK_RECENT_REPORTS = [
-  {
-    id: "4",
-    title: "Malicious Chrome Extension",
-    type: "Application",
-    reportDate: "2025-05-04",
-    status: "Confirmed",
-    verifications: 15,
-  },
-  {
-    id: "5",
-    title: "SUI Token Giveaway Scam",
-    type: "Social Media",
-    reportDate: "2025-05-02",
-    status: "Pending",
-    verifications: 3,
-  },
-  {
-    id: "6",
-    title: "Fake SUI NFT Marketplace",
-    type: "Website",
-    reportDate: "2025-05-03",
-    status: "Pending",
-    verifications: 7,
-  },
-];
+import { useWalletStore } from "../stores/walletStore";
 
 const StatsCard = ({ icon: Icon, title, value, description }) => (
   <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
@@ -189,7 +134,6 @@ const ReportCard = ({ report, isUserReport }) => {
 };
 
 const Dashboard = () => {
-  const { connected, account } = useWallet();
   const [activeTab, setActiveTab] = useState("overview");
   const [stats, setStats] = useState({
     totalReports: 0,
@@ -201,11 +145,12 @@ const Dashboard = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const { walletAddress, clearWallet, isConnected } = useWalletStore();
 
   // Fetch dashboard stats when component mounts or wallet connects
   useEffect(() => {
     const fetchDashboardStats = async () => {
-      if (!connected || !account) return;
+      if (!isConnected() || !walletAddress) return;
 
       setIsLoading(true);
       setError(null);
@@ -225,10 +170,10 @@ const Dashboard = () => {
     };
 
     fetchDashboardStats();
-  }, [connected, account]);
+  }, [walletAddress]);
 
   // If not connected, redirect to landing page
-  if (!connected) {
+  if (!isConnected()) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center py-16">
@@ -240,8 +185,7 @@ const Dashboard = () => {
             Please connect your wallet to access the dashboard.
           </p>
           <div className="inline-block">
-            {/* ConnectButton is already imported from @suiet/wallet-kit */}
-            <ConnectButton />
+            <ConnectButton onDisconnectSuccess={() => clearWallet()} />
           </div>
         </div>
       </div>
@@ -489,7 +433,7 @@ const Dashboard = () => {
                 You haven't submitted any reports yet.
               </p>
               <Link
-                to="/report/new"
+                to="/report"
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
               >
                 Submit your first report

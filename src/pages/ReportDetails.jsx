@@ -18,6 +18,9 @@ import {
   Loader,
 } from "lucide-react";
 import axiosClient from "../utils/apiClient";
+import { toast } from "react-toastify";
+import { Transaction } from "@mysten/sui/transactions";
+import { useWalletStore } from "../stores/walletStore";
 
 const EvidenceItem = ({ evidence }) => (
   <div className="flex items-start p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -106,7 +109,8 @@ const TimelineItem = ({ item, isLast }) => (
 
 const ReportDetails = () => {
   const { id } = useParams();
-  const { connected, address } = useWallet();
+  const { signAndExecuteTransaction } = useWallet();
+  const { walletAddress, isConnected } = useWalletStore();
 
   // State management
   const [report, setReport] = useState(null);
@@ -115,7 +119,12 @@ const ReportDetails = () => {
   const [verificationInput, setVerificationInput] = useState("");
   const [verifyStatus, setVerifyStatus] = useState(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
-
+  const [isBlockchainSubmitting, setIsBlockchainSubmitting] = useState(false);
+  const SMART_CONTRACT_CONFIG = {
+    PACKAGE_ID: import.meta.env.VITE_PACKAGE_ID,
+    CLOCK_OBJECT_ID: "0x6",
+    REGISTRY_OBJECT_ID: import.meta.env.VITE_REGISTRY_OBJECT_ID,
+  };
   // Fetch report data
   useEffect(() => {
     const fetchReport = async () => {
@@ -192,17 +201,68 @@ const ReportDetails = () => {
     critical: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
   };
 
+  const submitToBlockchain = async (isVerified) => {
+    if (!walletAddress) {
+      throw new Error("Wallet not connected");
+    }
+
+    setIsBlockchainSubmitting(true);
+
+    try {
+      const tx = new Transaction();
+
+      // Prepare arguments for smart contract
+      const args = [
+        tx.object(report.sui_object_id),
+        tx.object(SMART_CONTRACT_CONFIG.CLOCK_OBJECT_ID), // clock
+        tx.pure.bool(isVerified),
+        tx.pure.string(verificationInput.trim() || ""),
+      ];
+
+      // Call smart contract function
+      tx.moveCall({
+        target: `${SMART_CONTRACT_CONFIG.PACKAGE_ID}::report_registry::verify_report`,
+        arguments: args,
+      });
+
+      // Sign and execute transaction
+      const result = await signAndExecuteTransaction({
+        transaction: tx,
+        options: {
+          showEffects: true,
+          showEvents: true,
+          showObjectChanges: true,
+        },
+      });
+
+      console.log("Verification Transaction result:", JSON.stringify(result));
+      if (!result?.digest) {
+        throw new Error("Transaction failed");
+      }
+      toast.success("Report submitted to blockchain successfully!");
+      return result?.digest;
+    } catch (error) {
+      console.error("Blockchain submission error:", error);
+      toast.error(`Blockchain submission failed: ${error.message}`);
+      throw error;
+    } finally {
+      setIsBlockchainSubmitting(false);
+    }
+  };
+
   const handleVerify = async (isVerified) => {
-    if (!connected) {
+    if (!isConnected()) {
       alert("Please connect your wallet to verify this report");
       return;
     }
 
     try {
       setVerifyLoading(true);
+      const result = await submitToBlockchain(isVerified);
       const response = await axiosClient.post(`/reports/${id}/verify/`, {
         verified: isVerified,
         comment: verificationInput.trim() || null,
+        transaction_hash: result,
       });
 
       setVerifyStatus(isVerified ? "verified" : "rejected");
@@ -328,7 +388,7 @@ const ReportDetails = () => {
             {report.reporter_address && (
               <div className="flex items-center">
                 <span className="text-gray-700 dark:text-gray-300 font-medium mr-2">
-                  Address:
+                  Reporter Wallet:
                 </span>
                 <span className="font-mono text-sm text-gray-600 dark:text-gray-400">
                   {report.reporter_address?.substring(0, 10)}...
@@ -420,7 +480,7 @@ const ReportDetails = () => {
                     <button
                       onClick={() => handleVerify(true)}
                       className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={!connected || verifyLoading}
+                      disabled={!isConnected() || verifyLoading}
                     >
                       {verifyLoading ? (
                         <Loader className="h-4 w-4 mr-2 animate-spin" />
@@ -432,7 +492,7 @@ const ReportDetails = () => {
                     <button
                       onClick={() => handleVerify(false)}
                       className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={!connected || verifyLoading}
+                      disabled={!isConnected() || verifyLoading}
                     >
                       {verifyLoading ? (
                         <Loader className="h-4 w-4 mr-2 animate-spin" />
@@ -442,7 +502,7 @@ const ReportDetails = () => {
                       Reject Report
                     </button>
                   </div>
-                  {!connected && (
+                  {!isConnected() && (
                     <p className="mt-2 text-sm text-yellow-600 dark:text-yellow-400">
                       Connect your wallet to verify this report
                     </p>
@@ -454,7 +514,7 @@ const ReportDetails = () => {
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mt-10">
               <div className="flex items-start">
                 <span className="font-semibold mr-2 text-white">Notice:</span>
-                {report.reporter_address === address ? (
+                {report.reporter_address === walletAddress ? (
                   <span className="text-gray-100 dark:text-gray-400 mb-4">
                     You submitted this report. You cannot verify your own
                     report.

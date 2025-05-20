@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useWallet } from "@suiet/wallet-kit";
@@ -14,12 +13,35 @@ import ReportForm from "./pages/ReportForm";
 import ReportDetails from "./pages/ReportDetails";
 import SearchPage from "./pages/SearchPage";
 import LandingPage from "./pages/LandingPage";
-
+import { useWalletStore } from "./stores/walletStore";
 import "./App.css";
 
 function App() {
-  const { connected } = useWallet();
+  const { connected, account } = useWallet();
+  const { setWalletAddress, clearWallet, isConnected } = useWalletStore();
   const [darkMode, setDarkMode] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Handle store hydration
+  useEffect(() => {
+    // Small delay to ensure store has hydrated
+    const timer = setTimeout(() => {
+      setIsHydrated(true);
+    }, 1);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Sync wallet state with Suiet wallet
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    if (connected && account?.address) {
+      setWalletAddress(account.address);
+    } else {
+      clearWallet();
+    }
+  }, [connected, account?.address, setWalletAddress, clearWallet, isHydrated]);
 
   useEffect(() => {
     // Check user preference
@@ -56,12 +78,12 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route
             path="/report"
-            element={connected ? <ReportForm /> : <Navigate to="/" />}
+            element={isConnected() ? <ReportForm /> : <Navigate to="/" />}
           />
           <Route path="/search" element={<SearchPage />} />
           <Route
             path="/dashboard"
-            element={connected ? <Dashboard /> : <Navigate to="/" />}
+            element={isConnected() ? <Dashboard /> : <Navigate to="/" />}
           />
           <Route path="/reports/:id" element={<ReportDetails />} />
         </Routes>

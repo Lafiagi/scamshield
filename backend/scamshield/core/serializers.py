@@ -2,6 +2,7 @@ from django.utils import timezone
 from datetime import timedelta
 from rest_framework import serializers
 from core.models import ScamReport, Evidence, Verification, ScamTactic, TimelineEvent
+from core.utils import verify_sui_transaction
 
 
 class EvidenceSerializer(serializers.ModelSerializer):
@@ -48,6 +49,7 @@ class ScamReportListSerializer(serializers.ModelSerializer):
             "created_at",
             "verification_count",
             "rejection_count",
+            "scammer_address"
         ]
 
 
@@ -74,6 +76,7 @@ class ScamReportDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "verification_deadline",
             "transaction_hash",
+            "transaction_digest",
             "sui_object_id",
             "stake_amount",
             "verification_count",
@@ -94,9 +97,9 @@ class ScamReportDetailSerializer(serializers.ModelSerializer):
 
         # Check if this user has already verified this specific report
         has_verified = Verification.objects.filter(verifier=user, report=obj).exists()
-
         # User cannot verify their own report
         is_reporter = obj.reporter_address == getattr(user, "wallet_address", None)
+        print(f"HAs he verified: {has_verified} is he the reporter: {is_reporter} ")
 
         return not has_verified and not is_reporter
 
@@ -122,6 +125,7 @@ class ScamReportCreateSerializer(serializers.ModelSerializer):
             "additional_details",
             "evidence_files",
             "transaction_hash",
+            "transaction_digest",
             "sui_object_id",
             "stake_amount",
             "transaction_amount",
@@ -129,6 +133,7 @@ class ScamReportCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         evidence_files = validated_data.pop("evidence_files", [])
+        transaction_digest = validated_data.pop("transaction_digest", "")
 
         # Use the reporter address from the request context
         validated_data["reporter_address"] = self.context["request"].user.wallet_address
@@ -152,6 +157,7 @@ class ScamReportCreateSerializer(serializers.ModelSerializer):
         TimelineEvent.objects.create(
             report=report, date=timezone.now(), event="Report submitted to ScamShield"
         )
+        verify_sui_transaction(tx_digest=transaction_digest, report_id=report.id)
 
         return report
 
@@ -185,3 +191,8 @@ class VerificationCreateSerializer(serializers.ModelSerializer):
         )
 
         return verification
+
+
+class VerifyTransactionSerializer(serializers.Serializer):
+    transaction_hash = serializers.CharField(max_length=255)
+    report = serializers.CharField(max_length=255)

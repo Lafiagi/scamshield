@@ -5,6 +5,7 @@ from core.views import (
     MyReportsView,
     PendingVerificationsView,
     DashboardStatsView,
+    VerifyTransactionView
 )
 
 router = DefaultRouter()
@@ -19,4 +20,9 @@ urlpatterns = [
         name="pending-verifications",
     ),
     path("dashboard-stats/", DashboardStatsView.as_view(), name="dashboard-stats"),
+        path(
+        "api/verify-sui-transaction/",
+        VerifyTransactionView.as_view(),
+        name="verify_transaction",
+    ),
 ]

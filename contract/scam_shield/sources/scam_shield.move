@@ -49,7 +49,6 @@ module scam_shield::report_registry {
         scam_type: String,
         description: String,
         contact_info: Option<String>,
-        evidence_hashes: vector<String>,
         additional_details: Option<String>,
         status: ReportStatus,
         stake: Coin<SUI>,
@@ -110,7 +109,6 @@ module scam_shield::report_registry {
         scam_type: vector<u8>,
         description: vector<u8>,
         contact_info: vector<u8>,
-        evidence_hashes: vector<vector<u8>>,
         additional_details: vector<u8>,
         payment: Coin<SUI>,
         ctx: &mut TxContext
@@ -124,16 +122,6 @@ module scam_shield::report_registry {
 
         let current_time = clock::timestamp_ms(clock);
 
-        let mut string_evidence_hashes = vector[];
-        let mut i = 0;
-        while (i < vector::length(&evidence_hashes)) {
-            let hash = vector::borrow(&evidence_hashes, i);
-            vector::push_back(
-                &mut string_evidence_hashes,
-                string::utf8(*hash)
-            );
-            i = i + 1;
-        };
 
         let report = Report {
             id: object::new(ctx),
@@ -144,7 +132,6 @@ module scam_shield::report_registry {
             contact_info: if (vector::length(&contact_info) > 0) {
                 option::some(string::utf8(contact_info))
             } else {option::none()},
-            evidence_hashes: string_evidence_hashes,
             additional_details: if (vector::length(&additional_details) > 0) {
                 option::some(string::utf8(additional_details))
             } else {option::none()},
