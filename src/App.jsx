@@ -15,6 +15,8 @@ import SearchPage from "./pages/SearchPage";
 import LandingPage from "./pages/LandingPage";
 import { useWalletStore } from "./stores/walletStore";
 import "./App.css";
+import DeveloperDocs from "./pages/DeveloperDocs";
+import DetailedReportsPage from "./pages/DetailedReportsPage";
 
 function App() {
   const { connected, account } = useWallet();
@@ -27,7 +29,7 @@ function App() {
     // Small delay to ensure store has hydrated
     const timer = setTimeout(() => {
       setIsHydrated(true);
-    }, 1);
+    }, 10);
 
     return () => clearTimeout(timer);
   }, []);
@@ -80,11 +82,10 @@ function App() {
             path="/report"
             element={isConnected() ? <ReportForm /> : <Navigate to="/" />}
           />
+          <Route path="/report-details/:scammerAddress" element={<DetailedReportsPage />} />
           <Route path="/search" element={<SearchPage />} />
-          <Route
-            path="/dashboard"
-            element={isConnected() ? <Dashboard /> : <Navigate to="/" />}
-          />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/docs" element={<DeveloperDocs />} />
           <Route path="/reports/:id" element={<ReportDetails />} />
         </Routes>
       </main>

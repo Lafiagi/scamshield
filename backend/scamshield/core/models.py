@@ -15,6 +15,11 @@ class ScamReport(models.Model):
         ("medium", "Medium"),
         ("high", "High"),
     )
+    NETWORK_CHOICES = (
+        ("devnet", "devnet"),
+        ("testnet", "testnet"),
+        ("mainnet", "mainnet"),
+    )
 
     SCAM_TYPE_CHOICES = (
         ("website", "Website"),
@@ -50,6 +55,7 @@ class ScamReport(models.Model):
     transaction_hash = models.CharField(max_length=255, blank=True, null=True)
     transaction_digest = models.CharField(max_length=255, blank=True, null=True)
     sui_object_id = models.CharField(max_length=255, blank=True, null=True)
+    network = models.CharField(max_length=25, blank=True, null=True, default="testnet")
     stake_amount = models.BigIntegerField(default=0)
 
     # Counters

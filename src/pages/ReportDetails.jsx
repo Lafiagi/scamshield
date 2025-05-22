@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@suiet/wallet-kit";
 import {
   Shield,
@@ -16,49 +16,79 @@ import {
   Info,
   Code,
   Loader,
+  Share2,
+  ChevronLeft,
+  AlertTriangle,
+  Link as LinkIcon,
+  Copy,
+  Twitter,
+  Facebook,
+  Linkedin,
 } from "lucide-react";
 import axiosClient from "../utils/apiClient";
 import { toast } from "react-toastify";
 import { Transaction } from "@mysten/sui/transactions";
 import { useWalletStore } from "../stores/walletStore";
+import { truncateAddress } from "../utils/helpers";
 
-const EvidenceItem = ({ evidence }) => (
-  <div className="flex items-start p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-    <div className="p-2 rounded-md bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 mr-3">
-      {evidence.type === "transaction" && <ExternalLink className="h-5 w-5" />}
-      {evidence.type === "screenshot" && <Info className="h-5 w-5" />}
-      {evidence.type === "report" && <Flag className="h-5 w-5" />}
-      {evidence.type === "code" && <Code className="h-5 w-5" />}
-    </div>
-    <div>
-      <p className="font-medium text-gray-900 dark:text-white capitalize">
-        {evidence.type}
-      </p>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-        {evidence.description}
-      </p>
-      <a
-        href={evidence.link}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-sm text-blue-600 dark:text-blue-400 flex items-center hover:underline"
-      >
-        {evidence.type === "Transaction" ? "View transaction" : "View evidence"}
-        <ExternalLink className="h-3 w-3 ml-1" />
-      </a>
-    </div>
-  </div>
-);
+// Evidence item component with improved styling
+const EvidenceItem = ({ evidence }) => {
+  const getIconByType = (type) => {
+    switch (type) {
+      case "transaction":
+        return <ExternalLink className="h-5 w-5" />;
+      case "screenshot":
+        return <Info className="h-5 w-5" />;
+      case "report":
+        return <Flag className="h-5 w-5" />;
+      case "code":
+        return <Code className="h-5 w-5" />;
+      default:
+        return <Info className="h-5 w-5" />;
+    }
+  };
 
+  return (
+    <div className="flex items-start p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 transition-all hover:shadow-md">
+      <div className="p-3 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mr-4">
+        {getIconByType(evidence.type)}
+      </div>
+      <div className="flex-1">
+        <div className="flex justify-between items-center mb-1">
+          <p className="font-semibold text-gray-900 dark:text-white capitalize">
+            {evidence.type}
+          </p>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {new Date(evidence.created_at).toLocaleDateString()}
+          </span>
+        </div>
+        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+          {evidence.description}
+        </p>
+        <a
+          href={evidence.file}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-blue-600 dark:text-blue-400 flex items-center hover:underline group"
+        >
+          <span>View evidence</span>
+          <ExternalLink className="h-3 w-3 ml-1 group-hover:translate-x-0.5 transition-transform" />
+        </a>
+      </div>
+    </div>
+  );
+};
+
+// Verification item component with improved styling
 const VerificationItem = ({ verification }) => (
   <div className="border-b border-gray-200 dark:border-gray-700 py-4 last:border-0">
     <div className="flex items-center justify-between mb-2">
       <div className="flex items-center">
         <div
-          className={`p-1 rounded-full ${
+          className={`p-1.5 rounded-full ${
             verification.verified
-              ? "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400"
-              : "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400"
+              ? "bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400"
+              : "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400"
           } mr-2`}
         >
           {verification.verified ? (
@@ -72,7 +102,7 @@ const VerificationItem = ({ verification }) => (
           {verification.verifier?.substring(verification.verifier.length - 4)}
         </span>
       </div>
-      <span className="text-sm text-gray-500 dark:text-gray-400">
+      <span className="text-xs text-gray-500 dark:text-gray-400">
         {new Date(verification.timestamp).toLocaleDateString("en-GB", {
           hour: "2-digit",
           minute: "2-digit",
@@ -80,22 +110,25 @@ const VerificationItem = ({ verification }) => (
         })}
       </span>
     </div>
-    <p className="text-gray-600 dark:text-gray-300 text-sm">
-      {verification.comment}
-    </p>
+    {verification.comment && (
+      <p className="text-gray-600 dark:text-gray-300 text-sm pl-7">
+        "{verification.comment}"
+      </p>
+    )}
   </div>
 );
 
+// Timeline item component with improved styling
 const TimelineItem = ({ item, isLast }) => (
   <div className="flex">
     <div className="flex flex-col items-center mr-4">
-      <div className="rounded-full h-3 w-3 bg-blue-600 dark:bg-blue-500"></div>
+      <div className="rounded-full h-3 w-3 bg-blue-500 dark:bg-blue-400 shadow-md shadow-blue-500/20"></div>
       {!isLast && (
-        <div className="h-full w-0.5 bg-blue-200 dark:bg-blue-800"></div>
+        <div className="h-full w-0.5 bg-gradient-to-b from-blue-500 to-blue-200 dark:from-blue-400 dark:to-blue-800/20"></div>
       )}
     </div>
     <div className="pb-6">
-      <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
         {new Date(item.date).toLocaleDateString("en-GB", {
           hour: "2-digit",
           minute: "2-digit",
@@ -107,10 +140,12 @@ const TimelineItem = ({ item, isLast }) => (
   </div>
 );
 
+// Main component
 const ReportDetails = () => {
   const { id } = useParams();
   const { signAndExecuteTransaction } = useWallet();
   const { walletAddress, isConnected } = useWalletStore();
+  const navigate = useNavigate();
 
   // State management
   const [report, setReport] = useState(null);
@@ -120,11 +155,14 @@ const ReportDetails = () => {
   const [verifyStatus, setVerifyStatus] = useState(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [isBlockchainSubmitting, setIsBlockchainSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   const SMART_CONTRACT_CONFIG = {
     PACKAGE_ID: import.meta.env.VITE_PACKAGE_ID,
     CLOCK_OBJECT_ID: "0x6",
     REGISTRY_OBJECT_ID: import.meta.env.VITE_REGISTRY_OBJECT_ID,
   };
+
   // Fetch report data
   useEffect(() => {
     const fetchReport = async () => {
@@ -148,59 +186,16 @@ const ReportDetails = () => {
     }
   }, [id]);
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <Loader className="h-16 w-16 text-blue-500 animate-spin mb-4" />
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          Loading Report
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400">
-          Please wait while we fetch the report details...
-        </p>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error || !report) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <AlertCircle className="h-16 w-16 text-red-500 mb-4" />
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          {error ? "Error Loading Report" : "Report Not Found"}
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
-          {error ||
-            "The report you're looking for doesn't exist or has been removed."}
-        </p>
-        <Link
-          to="/search"
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md transition-colors"
-        >
-          Back to Search
-        </Link>
-      </div>
-    );
-  }
-
-  const statusColors = {
-    verified:
-      "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-    "Under Review":
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-    rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+  // Copy to clipboard functionality
+  const copyToClipboard = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast.success("Link copied to clipboard!");
   };
 
-  const riskColors = {
-    low: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-    medium:
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-    high: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
-    critical: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
-  };
-
+  // Handle blockchain submission
   const submitToBlockchain = async (isVerified) => {
     if (!walletAddress) {
       throw new Error("Wallet not connected");
@@ -250,9 +245,10 @@ const ReportDetails = () => {
     }
   };
 
+  // Handle verification
   const handleVerify = async (isVerified) => {
     if (!isConnected()) {
-      alert("Please connect your wallet to verify this report");
+      toast.error("Please connect your wallet to verify this report");
       return;
     }
 
@@ -268,6 +264,12 @@ const ReportDetails = () => {
       setVerifyStatus(isVerified ? "verified" : "rejected");
       setVerificationInput("");
 
+      toast.success(
+        isVerified
+          ? "You've successfully verified this report!"
+          : "You've rejected this report."
+      );
+
       // Update the report with the new verification
       if (response.data) {
         setReport((prev) => ({
@@ -278,7 +280,7 @@ const ReportDetails = () => {
       }
     } catch (err) {
       console.error("Error submitting verification:", err);
-      alert(
+      toast.error(
         err.response?.data?.message ||
           "Failed to submit verification. Please try again."
       );
@@ -287,73 +289,177 @@ const ReportDetails = () => {
     }
   };
 
-  return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
-      {/* Header with Back Link */}
-      <div className="flex items-center mb-6">
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] py-12">
+        <Loader className="h-12 w-12 text-blue-500 animate-spin mb-6" />
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          Loading Report
+        </h2>
+        <p className="text-gray-600 dark:text-gray-400 max-w-md text-center">
+          Please wait while we fetch the report details...
+        </p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !report) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] py-12">
+        <div className="p-4 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 mb-6">
+          <AlertCircle className="h-10 w-10" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          {error ? "Error Loading Report" : "Report Not Found"}
+        </h2>
+        <p className="text-gray-600 dark:text-gray-400 max-w-md text-center mb-6">
+          {error ||
+            "The report you're looking for doesn't exist or has been removed."}
+        </p>
         <Link
           to="/search"
-          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center"
+          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md transition-colors"
         >
-          <svg
-            className="h-5 w-5 mr-1"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M10 19l-7-7m0 0l7-7m-7 7h18"
-            />
-          </svg>
           Back to Search
         </Link>
       </div>
+    );
+  }
+
+  // Status and risk level styling
+  const statusColors = {
+    verified:
+      "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border-green-200 dark:border-green-800",
+    "under review":
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800",
+    rejected:
+      "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800",
+    pending:
+      "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+  };
+
+  const riskColors = {
+    low: "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+    medium:
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800",
+    high: "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300 border-orange-200 dark:border-orange-800",
+    critical:
+      "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800",
+  };
+
+  return (
+    <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6">
+      {/* Header with Back Link */}
+      <div className="flex items-center mb-8">
+        <button
+          className="inline-flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+          onClick={() => navigate(-1)}
+        >
+          <ChevronLeft className="h-5 w-5 mr-1" />
+          <span>Back to Reports</span>
+        </button>
+      </div>
 
       {/* Report Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <div className="flex items-center mb-2">
-            <Shield className="h-6 w-6 text-blue-600 dark:text-blue-400 mr-2" />
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {report.title}
-            </h1>
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-8 border border-gray-100 dark:border-gray-700">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+          <div className="flex-1">
+            <div className="flex items-center mb-3">
+              <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mr-3">
+                <Shield className="h-6 w-6" />
+              </div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
+                {report.title}
+              </h1>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mb-4">
+              <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600 font-medium">
+                {report.scam_type}
+              </span>
+              <span
+                className={`text-xs px-3 py-1.5 rounded-full capitalize font-medium border ${
+                  statusColors[report.status?.toLowerCase() || "pending"]
+                }`}
+              >
+                {report.status}
+              </span>
+              <span
+                className={`text-xs px-3 py-1.5 rounded-full capitalize font-medium border ${
+                  riskColors[report.risk_level?.toLowerCase() || "medium"]
+                }`}
+              >
+                {report.risk_level} Risk
+              </span>
+              <span className="text-xs px-3 py-1.5 rounded-full capitalize font-medium border bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 border-purple-200 dark:border-purple-800">
+                {report.network}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                <Calendar className="h-4 w-4 mr-1.5" />
+                <span>
+                  Reported on {new Date(report.created_at).toLocaleDateString()}
+                </span>
+              </div>
+
+              <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                <Clock className="h-4 w-4 mr-1.5" />
+                <span>
+                  Verification deadline:{" "}
+                  {new Date(report.verification_deadline).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2 mb-4">
-            <span className="text-sm px-3 py-1 rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-              {report.type}
-            </span>
-            <span
-              className={`text-sm px-3 py-1 rounded-full ${
-                statusColors[report.status]
-              }`}
-            >
-              {report.status}
-            </span>
-            <span
-              className={`text-sm px-3 py-1 rounded-full capitalize ${
-                riskColors[report.risk_level]
-              }`}
-            >
-              {report.risk_level} Risk
-            </span>
-          </div>
-          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-            <Calendar className="h-4 w-4 mr-1" />
-            <span>
-              Reported on {new Date(report.created_at).toLocaleDateString()}
-            </span>
+
+          <div className="flex flex-col items-end">
+            <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-xl mb-2">
+              <div className="p-1.5 rounded-full bg-blue-100 dark:bg-blue-900/40">
+                <UserCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <span className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+                {report.verificationCount}{" "}
+                {report.verificationCount === 1
+                  ? "Verification"
+                  : "Verifications"}
+              </span>
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              {report.rejection_count}{" "}
+              {report.rejection_count === 1 ? "Rejection" : "Rejections"}
+            </div>
           </div>
         </div>
-        <div className="flex items-center">
-          <div className="bg-blue-100 dark:bg-blue-900 p-2 rounded-full">
-            <UserCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          </div>
-          <span className="ml-2 text-gray-700 dark:text-gray-300 font-medium">
-            {report.verificationCount} Verifications
-          </span>
+
+        {/* Quick Actions */}
+        <div className="flex flex-wrap gap-3 mt-2">
+          <button
+            onClick={copyToClipboard}
+            className="inline-flex items-center text-sm px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            {copied ? (
+              <Check className="h-4 w-4 mr-1.5" />
+            ) : (
+              <Copy className="h-4 w-4 mr-1.5" />
+            )}
+            {copied ? "Copied!" : "Copy Link"}
+          </button>
+
+          <a
+            href={`https://${report.network}.suivision.xyz/txblock/${report.transaction_digest}?tab=Overview`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`inline-flex items-center text-sm px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+              !report.transaction_digest ? "opacity-50 pointer-events-none" : ""
+            }`}
+          >
+            <ExternalLink className="h-4 w-4 mr-1.5" />
+            Blockchain Record
+          </a>
         </div>
       </div>
 
@@ -362,51 +468,83 @@ const ReportDetails = () => {
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-8">
           {/* Description */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Description
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 border border-gray-100 dark:border-gray-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+              <AlertTriangle className="h-5 w-5 mr-2 text-red-500" />
+              Scam Alert
             </h2>
-            <p className="text-gray-700 dark:text-gray-300 mb-4">
+            <p className="text-gray-700 dark:text-gray-300 mb-6 text-lg leading-relaxed">
               {report.description}
             </p>
-            {report.url && (
-              <div className="flex items-center mb-2">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mr-2">
-                  URL:
-                </span>
-                <a
-                  href={report.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-red-600 dark:text-red-400 hover:underline flex items-center"
-                >
-                  {report.url}
-                  <ExternalLink className="h-3 w-3 ml-1" />
-                </a>
-              </div>
-            )}
-            {report.reporter_address && (
-              <div className="flex items-center">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mr-2">
-                  Reporter Wallet:
-                </span>
-                <span className="font-mono text-sm text-gray-600 dark:text-gray-400">
-                  {report.reporter_address?.substring(0, 10)}...
-                  {report.reporter_address?.substring(
-                    report.reporter_address.length - 10
-                  )}
-                </span>
-              </div>
-            )}
+
+            <div className="space-y-4">
+              {/* Scammer Address */}
+              {report.scammer_address && (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50">
+                  <span className="font-medium text-red-800 dark:text-red-300 whitespace-nowrap">
+                    Scammer Address:
+                  </span>
+                  <div className="flex items-center gap-2 flex-1">
+                    <code className="p-1.5 rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 text-sm font-mono flex-1 overflow-x-auto whitespace-nowrap">
+                      {truncateAddress( report.scammer_address, 20)}
+                    </code>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(report.scammer_address);
+                        toast.success("Address copied to clipboard!");
+                      }}
+                      className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-300"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* URL if available */}
+              {report.url && (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600">
+                  <span className="font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                    Malicious URL:
+                  </span>
+                  <div className="flex items-center gap-2 flex-1">
+                    <code className="p-1.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-mono flex-1 overflow-x-auto whitespace-nowrap">
+                      {report.url}
+                    </code>
+                    <a
+                      href={report.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Contact info if available */}
+              {report.contact_info && (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600">
+                  <span className="font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                    Contact:
+                  </span>
+                  <span className="text-gray-700 dark:text-gray-300 text-sm">
+                    {report.contact_info}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Evidence */}
           {report.evidence && report.evidence.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 border border-gray-100 dark:border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <LinkIcon className="h-5 w-5 mr-2 text-blue-500" />
                 Evidence
               </h2>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {report.evidence.map((item, index) => (
                   <EvidenceItem key={index} evidence={item} />
                 ))}
@@ -416,13 +554,21 @@ const ReportDetails = () => {
 
           {/* Scam Tactics */}
           {report.scamTactics && report.scamTactics.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 border border-gray-100 dark:border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <Flag className="h-5 w-5 mr-2 text-red-500" />
                 Scam Tactics
               </h2>
-              <ul className="list-disc pl-5 text-gray-700 dark:text-gray-300 space-y-2">
+              <ul className="space-y-3">
                 {report.scamTactics.map((tactic, index) => (
-                  <li key={index}>{tactic}</li>
+                  <li key={index} className="flex items-start">
+                    <div className="p-1 rounded-full bg-red-100 dark:bg-red-900/30 mr-3 mt-0.5">
+                      <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    </div>
+                    <span className="text-gray-700 dark:text-gray-300">
+                      {tactic}
+                    </span>
+                  </li>
                 ))}
               </ul>
             </div>
@@ -430,16 +576,17 @@ const ReportDetails = () => {
 
           {/* Verification Form */}
           {report.user_can_verify ? (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 border border-gray-100 dark:border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <UserCheck className="h-5 w-5 mr-2 text-blue-500" />
                 Verify This Report
               </h2>
               {verifyStatus ? (
                 <div
-                  className={`p-4 mb-4 rounded-lg ${
+                  className={`p-4 mb-4 rounded-xl ${
                     verifyStatus === "verified"
-                      ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200"
-                      : "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200"
+                      ? "bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-900/50 text-green-800 dark:text-green-200"
+                      : "bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 text-red-800 dark:text-red-200"
                   }`}
                 >
                   <p className="flex items-center">
@@ -450,7 +597,7 @@ const ReportDetails = () => {
                     )}
                     Thank you for your contribution! Your{" "}
                     {verifyStatus === "verified" ? "verification" : "rejection"}{" "}
-                    has been submitted.
+                    has been submitted and recorded on the blockchain.
                   </p>
                 </div>
               ) : (
@@ -459,10 +606,20 @@ const ReportDetails = () => {
                     Have you encountered this scam? Help protect the community
                     by verifying this report.
                   </p>
-                  <div className="mb-4">
+                  <div className="mb-4 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-900/50">
+                    <div className="flex items-start mb-2">
+                      <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2 mt-0.5" />
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        Your verification will be recorded on the blockchain and
+                        help others identify this scam. You can add an optional
+                        comment to provide more context.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mb-5">
                     <label
                       htmlFor="comment"
-                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
                     >
                       Your Comment (Optional)
                     </label>
@@ -471,15 +628,15 @@ const ReportDetails = () => {
                       value={verificationInput}
                       onChange={(e) => setVerificationInput(e.target.value)}
                       rows="3"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       placeholder="Share your experience or add more details..."
                       disabled={verifyLoading}
                     ></textarea>
                   </div>
-                  <div className="flex space-x-4">
+                  <div className="flex flex-col sm:flex-row gap-4">
                     <button
                       onClick={() => handleVerify(true)}
-                      className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center justify-center px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-medium rounded-xl shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={!isConnected() || verifyLoading}
                     >
                       {verifyLoading ? (

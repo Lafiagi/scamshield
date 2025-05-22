@@ -49,7 +49,13 @@ class ScamReportListSerializer(serializers.ModelSerializer):
             "created_at",
             "verification_count",
             "rejection_count",
-            "scammer_address"
+            "scammer_address",
+            "transaction_amount",
+            "description",
+            "stake_amount",
+            "verification_deadline",
+            "network",
+            "transaction_digest"
         ]
 
 
@@ -86,6 +92,7 @@ class ScamReportDetailSerializer(serializers.ModelSerializer):
             "scam_tactics",
             "timeline",
             "user_can_verify",
+            "network"
         ]
 
     def get_user_can_verify(self, obj: ScamReport):
@@ -133,7 +140,7 @@ class ScamReportCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         evidence_files = validated_data.pop("evidence_files", [])
-        transaction_digest = validated_data.pop("transaction_digest", "")
+        transaction_digest = validated_data.get("transaction_digest", "")
 
         # Use the reporter address from the request context
         validated_data["reporter_address"] = self.context["request"].user.wallet_address

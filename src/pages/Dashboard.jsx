@@ -1,51 +1,89 @@
-import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { ConnectButton } from "@suiet/wallet-kit";
+import { useState, useEffect } from "react";
 import {
-  Shield,
-  AlertCircle,
-  FileText,
   Clock,
   Check,
   X,
-  Search,
-  TrendingUp,
   Users,
-  ChevronRight,
+  AlertTriangle,
+  Filter,
+  Search,
+  Shield,
+  ArrowUpDown,
+  DollarSign,
+  BarChart3,
+  ExternalLink,
+  Copy,
+  Wallet,
+  AlertCircle,
+  MessageSquare,
 } from "lucide-react";
+import _ from "lodash";
+import { Link } from "react-router-dom";
 import axiosClient from "../utils/apiClient";
-import { useWalletStore } from "../stores/walletStore";
+import TopScamTypes from "../components/TopScamTypes";
 
-const StatsCard = ({ icon: Icon, title, value, description }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-    <div className="flex items-center mb-4">
-      <div className="bg-blue-100 dark:bg-blue-900 p-2 rounded-full mr-3">
-        <Icon className="h-5 w-5 text-blue-600 dark:text-blue-300" />
-      </div>
-      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-        {title}
-      </h3>
-    </div>
-    <div className="flex items-end">
-      <p className="text-2xl font-bold text-gray-900 dark:text-white">
-        {value}
-      </p>
-      {description && (
-        <span className="ml-2 text-sm text-gray-500 dark:text-gray-400 mb-1">
-          {description}
-        </span>
-      )}
-    </div>
-  </div>
-);
+// Format date to be more readable
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
-const ReportCard = ({ report, isUserReport }) => {
+// Get time remaining until deadline
+const getTimeRemaining = (deadline) => {
+  const now = new Date();
+  const deadlineDate = new Date(deadline);
+  const diff = deadlineDate - now;
+
+  if (diff <= 0) return "Expired";
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+  if (days > 0) return `${days}d ${hours}h left`;
+  return `${hours}h left`;
+};
+
+// Risk level badge component
+const RiskBadge = ({ level }) => {
+  const getBadgeColor = () => {
+    switch (level.toLowerCase()) {
+      case "low":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
+      case "medium":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
+      case "high":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
+      case "critical":
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+    }
+  };
+
+  return (
+    <div
+      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getBadgeColor()}`}
+    >
+      <AlertTriangle className="h-3 w-3 mr-1" />
+      {level.charAt(0).toUpperCase() + level.slice(1)} Risk
+    </div>
+  );
+};
+
+// Report card component
+const ReportCard = ({ report }) => {
+  const [expanded, setExpanded] = useState(false);
+
   const getStatusColor = (status) => {
-    switch (status) {
-      case "Confirmed":
+    switch (status.toLowerCase()) {
       case "verified":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
-      case "Rejected":
       case "rejected":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
       default:
@@ -54,11 +92,9 @@ const ReportCard = ({ report, isUserReport }) => {
   };
 
   const getStatusIcon = (status) => {
-    switch (status) {
-      case "Confirmed":
+    switch (status.toLowerCase()) {
       case "verified":
         return <Check className="h-4 w-4" />;
-      case "Rejected":
       case "rejected":
         return <X className="h-4 w-4" />;
       default:
@@ -66,16 +102,38 @@ const ReportCard = ({ report, isUserReport }) => {
     }
   };
 
+  const getScamTypeIcon = (type) => {
+    switch (type.toLowerCase()) {
+      case "impersonation":
+        return <AlertCircle className="h-4 w-4" />;
+      case "airdrop":
+        return <DollarSign className="h-4 w-4" />;
+      case "wallet":
+        return <Wallet className="h-4 w-4" />;
+      case "website":
+      case "phishing":
+        return <ExternalLink className="h-4 w-4" />;
+      case "social_media":
+        return <MessageSquare className="h-4 w-4" />;
+      case "fake_investment":
+      case "fake_defi":
+        return <BarChart3 className="h-4 w-4" />;
+      default:
+        return <AlertTriangle className="h-4 w-4" />;
+    }
+  };
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700 mb-3">
+    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700 mb-4 transition-all duration-200 hover:shadow-md">
       <div className="flex justify-between mb-2">
-        <div className="flex items-center">
-          <div className="mr-2 text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-            {report.type}
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="mr-2 text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 flex items-center">
+            {getScamTypeIcon(report.scam_type)}
+            <span className="ml-1 capitalize">
+              {report.scam_type.replace("_", " ")}
+            </span>
           </div>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {report.reportDate}
-          </span>
+          <RiskBadge level={report.risk_level} />
         </div>
         <div
           className={`flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
@@ -83,365 +141,473 @@ const ReportCard = ({ report, isUserReport }) => {
           )}`}
         >
           {getStatusIcon(report.status)}
-          <span className="ml-1">{report.status}</span>
+          <span className="ml-1 capitalize">{report.status}</span>
         </div>
       </div>
-      <Link to={`/reports/${report.id}`} className="block hover:underline">
-        <h3 className="font-medium text-gray-900 dark:text-white mb-2">
-          {report.title}
-        </h3>
-      </Link>
-      {isUserReport ? (
-        <div className="flex items-center justify-between mt-2">
-          <div className="flex items-center">
-            <div className="bg-gray-100 dark:bg-gray-700 h-2 w-24 rounded-full overflow-hidden">
-              <div
-                className={`h-full ${
-                  report.status === "Confirmed" || report.status === "verified"
-                    ? "bg-green-500"
-                    : "bg-blue-500"
-                }`}
-                style={{
-                  width: `${
-                    (report.currentVerifications /
-                      report.requiredVerifications) *
-                    100
-                  }%`,
-                }}
-              ></div>
-            </div>
-            <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-              {report.currentVerifications}/{report.requiredVerifications}{" "}
-              verifications
-            </span>
-          </div>
-          {report.rewardTokens > 0 && (
-            <div className="flex items-center text-sm font-medium text-blue-600 dark:text-blue-400">
-              <span>{report.rewardTokens} SUI</span>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="flex items-center mt-2">
-          <Users className="h-4 w-4 text-gray-500 dark:text-gray-400 mr-1" />
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {report.verification_count} verifications
+
+      <div className="cursor-pointer">
+        <Link to={`/reports/${report?.id}`} className="block">
+          <h3 className="font-medium text-gray-900 dark:text-white mb-1 text-lg hover:text-blue-600 transition-colors">
+            {report.title}
+          </h3>
+        </Link>
+        <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
+          <span className="mr-2">{formatDate(report.created_at)}</span>
+          <span className="flex items-center">
+            <Clock className="h-3 w-3 mr-1" />
+            {getTimeRemaining(report.verification_deadline)}
           </span>
         </div>
-      )}
+
+        <p
+          className={`text-gray-600 dark:text-gray-300 text-sm ${
+            expanded ? "" : "line-clamp-2"
+          }`}
+        >
+          {report.description}
+        </p>
+      </div>
     </div>
   );
 };
 
+// Stats card component
+const StatsCard = ({ icon, title, value, trend, change }) => {
+  return (
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+          {title}
+        </h3>
+        <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+          {icon}
+        </div>
+      </div>
+      <div className="flex items-end">
+        <span className="text-2xl font-bold text-gray-900 dark:text-white">
+          {value}
+        </span>
+        {trend && (
+          <div
+            className={`ml-2 mb-1 flex items-center text-xs font-medium ${
+              trend === "up" ? "text-green-600" : "text-red-600"
+            }`}
+          >
+            {trend === "up" ? (
+              <span>↑ {change}%</span>
+            ) : (
+              <span>↓ {change}%</span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Dashboard component
 const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState("overview");
-  const [stats, setStats] = useState({
-    totalReports: 0,
-    activeVerifiers: 0,
-    protectedWallets: 0,
-    preventedValue: "$0",
-    recentReports: [],
-    myReports: [],
-  });
-  const [isLoading, setIsLoading] = useState(false);
+  const [reports, setReports] = useState([]);
+  const [userReports, setUserReports] = useState([]);
+  const [filter, setFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
   const [error, setError] = useState(null);
-  const { walletAddress, clearWallet, isConnected } = useWalletStore();
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState({});
+  const [selectedTab, setSelectedTab] = useState("all");
+  const [apiKeys, setApiKeys] = useState([]);
+  const [apiLoading, setApiLoading] = useState(false);
 
-  // Fetch dashboard stats when component mounts or wallet connects
+  const fetchApiKeys = async () => {
+    try {
+      setApiLoading(true);
+      const res = await axiosClient.get("/merchants/");
+      setApiKeys(res.data || []);
+    } catch (e) {
+      console.error("Failed to fetch API keys", e);
+    } finally {
+      setApiLoading(false);
+    }
+  };
+
+  const generateApiKey = async () => {
+    try {
+      setApiLoading(true);
+      const res = await axiosClient.post("/merchants/1/generate_api_key/");
+      setApiKeys(res.data);
+    } catch (e) {
+      console.error("Failed to generate API key", e);
+    } finally {
+      setApiLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchDashboardStats = async () => {
-      if (!isConnected() || !walletAddress) return;
+    fetchApiKeys();
+  }, []);
 
-      setIsLoading(true);
-      setError(null);
-
+  useEffect(() => {
+    const fetchReport = async () => {
       try {
+        setLoading(true);
+        setError(null);
         const response = await axiosClient.get(`/dashboard-stats/`);
-
-        setStats(response.data);
+        setReports(response.data?.recentReports || []);
+        setUserReports(response?.data?.myRecentReports || []);
+        setStats(response?.data);
       } catch (err) {
-        console.error("Error fetching dashboard stats:", err);
+        console.error("Error fetching report:", err);
         setError(
-          "Failed to load dashboard statistics. Please try again later."
+          err.response?.data?.message || "Failed to fetch report details"
         );
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    fetchDashboardStats();
-  }, [walletAddress]);
+    fetchReport();
+  }, []);
 
-  // If not connected, redirect to landing page
-  if (!isConnected()) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-        <div className="text-center py-16">
-          <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Wallet Not Connected
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Please connect your wallet to access the dashboard.
-          </p>
-          <div className="inline-block">
-            <ConnectButton onDisconnectSuccess={() => clearWallet()} />
-          </div>
-        </div>
-      </div>
+  // Filtered reports
+  const getFilteredReports = () => {
+    let filtered = reports;
+
+    if (selectedTab === "my-reports") {
+      filtered = userReports;
+    }
+
+    if (filter !== "all") {
+      filtered = filtered.filter(
+        (report) => report.status.toLowerCase() === filter
+      );
+    }
+
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (report) =>
+          report.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          report.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          report.scam_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          report.scammer_address
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          report.reporter_address
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Sort reports
+    return _.orderBy(
+      filtered,
+      [(r) => new Date(r.created_at)],
+      [sortBy === "newest" ? "desc" : "asc"]
     );
-  }
+  };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Dashboard
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Manage your reports and account
-          </p>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+      <main className="container mx-auto px-4 py-6">
+        {/* Stats Row */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <StatsCard
+            icon={
+              <AlertTriangle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            }
+            title="Total Reports"
+            value={stats?.totalReports || 0}
+            trend="up"
+            change="12"
+          />
+          <StatsCard
+            icon={
+              <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
+            }
+            title="Verified Scams"
+            value={stats?.totalVerified || 0}
+            trend="up"
+            change="0"
+          />
+          <StatsCard
+            icon={
+              <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+            }
+            title="Pending Verification"
+            value={stats?.totalPending || 0}
+          />
+          <StatsCard
+            icon={
+              <DollarSign className="h-5 w-5 text-red-600 dark:text-red-400" />
+            }
+            title="Amount at Risk (USD)"
+            value={stats?.preventedValue?.toLocaleString() || 0}
+            trend="up"
+            change="23"
+          />
         </div>
-        <div className="mt-4 sm:mt-0">
-          <Link
-            to="/report"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 flex items-center"
-          >
-            <FileText className="h-4 w-4 mr-2" />
-            New Report
-          </Link>
-        </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-        <ul className="flex flex-wrap -mb-px">
-          <li className="mr-2">
-            <button
-              onClick={() => setActiveTab("overview")}
-              className={`inline-flex items-center py-3 px-4 text-sm font-medium ${
-                activeTab === "overview"
-                  ? "text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400"
-                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-              }`}
-            >
-              Overview
-            </button>
-          </li>
-          <li className="mr-2">
-            <button
-              onClick={() => setActiveTab("myReports")}
-              className={`inline-flex items-center py-3 px-4 text-sm font-medium ${
-                activeTab === "myReports"
-                  ? "text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400"
-                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-              }`}
-            >
-              My Reports
-            </button>
-          </li>
-        </ul>
-      </div>
-
-      {/* Content */}
-      {activeTab === "overview" ? (
-        <>
-          {/* Stats */}
-          {error && (
-            <div
-              className="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
-              role="alert"
-            >
-              <span className="block sm:inline">{error}</span>
+        {/* Tabs & Filters */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+          <div className="flex flex-col sm:flex-row">
+            <div className="flex border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setSelectedTab("all")}
+                className={`px-4 py-3 text-sm font-medium ${
+                  selectedTab === "all"
+                    ? "text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400"
+                    : "text-gray-500 dark:text-gray-400"
+                }`}
+              >
+                Most Recent Reports
+              </button>
+              <button
+                onClick={() => setSelectedTab("my-reports")}
+                className={`px-4 py-3 text-sm font-medium ${
+                  selectedTab === "my-reports"
+                    ? "text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400"
+                    : "text-gray-500 dark:text-gray-400"
+                }`}
+              >
+                My Reports ({userReports.length})
+              </button>
             </div>
-          )}
 
-          {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              {[...Array(4)].map((_, index) => (
-                <div
-                  key={index}
-                  className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 animate-pulse"
-                >
-                  <div className="flex items-center mb-4">
-                    <div className="bg-gray-200 dark:bg-gray-700 h-8 w-8 rounded-full mr-3"></div>
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+            <div className="flex-1 p-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-4 w-4 text-gray-400" />
                   </div>
-                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                  <input
+                    type="text"
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-800 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Search reports..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <StatsCard
-                icon={FileText}
-                title="Total Reports"
-                value={stats.totalReports}
-              />
-              <StatsCard
-                icon={Users}
-                title="Active Verifiers"
-                value={stats.activeVerifiers}
-              />
-              <StatsCard
-                icon={Shield}
-                title="Protected Wallets"
-                value={stats.protectedWallets}
-              />
-              <StatsCard
-                icon={TrendingUp}
-                title="Prevented Value"
-                value={stats.preventedValue}
-              />
-            </div>
-          )}
 
-          {/* Recent Reports & Search */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-                    Recent Reports
-                  </h2>
-                  {stats?.recentReports?.length > 3 ? (
-                    <Link
-                      to="/search"
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center"
+                <div className="flex gap-2">
+                  <div className="relative">
+                    <select
+                      value={filter}
+                      onChange={(e) => setFilter(e.target.value)}
+                      className="block appearance-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 pr-8 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >
-                      View all
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Link>
-                  ) : null}
-                </div>
-                <div>
-                  {stats?.recentReports?.length > 0 ? (
-                    <div>
-                      {stats?.recentReports?.map((report) => (
-                        <ReportCard
-                          key={report.id}
-                          report={report}
-                          isUserReport={false}
-                        />
-                      ))}
+                      <option value="all">All Status</option>
+                      <option value="pending">Pending</option>
+                      <option value="verified">Verified</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                      <Filter className="h-4 w-4 text-gray-400" />
                     </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
-                        No reports yet
-                      </h3>
+                  </div>
 
-                      <Link
-                        to="/report"
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-                      >
-                        Submit a new report
-                      </Link>
+                  <div className="relative">
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="block appearance-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 pr-8 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="newest">Newest First</option>
+                      <option value="oldest">Oldest First</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                      <ArrowUpDown className="h-4 w-4 text-gray-400" />
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="lg:col-span-1">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                  Quick Search
+          </div>
+        </div>
+
+        {/* Content Area */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Reports List */}
+          <div className="lg:col-span-2">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium">
+                  {selectedTab === "my-reports"
+                    ? "My Reports"
+                    : "Recent Reports"}
                 </h2>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search reports..."
-                    className="w-full p-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                  <Search className="h-5 w-5 text-gray-400 absolute left-3 top-2.5" />
-                </div>
-                <div className="mt-4">
-                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                    Popular searches
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    <button className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full px-3 py-1 hover:bg-gray-200 dark:hover:bg-gray-600">
-                      Phishing
+                <div className="flex items-center  mb-4">
+                  <Link to={`/report`} className="block hover:underline">
+                    <button className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md text-sm font-medium">
+                      + New Report
                     </button>
-                    <button className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full px-3 py-1 hover:bg-gray-200 dark:hover:bg-gray-600">
-                      Fake wallet
+                  </Link>
+                  <Link to={`/search`} className="block hover:underline ml-2">
+                    <button className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md text-sm font-medium">
+                      View All
+                      {(stats?.totalReports || 0) > 0
+                        ? ` (${stats?.totalReports})`
+                        : ""}
                     </button>
-                    <button className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full px-3 py-1 hover:bg-gray-200 dark:hover:bg-gray-600">
-                      Scam
-                    </button>
-                    <button className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full px-3 py-1 hover:bg-gray-200 dark:hover:bg-gray-600">
-                      Malicious extension
-                    </button>
-                  </div>
-                </div>
-                <div className="mt-6">
-                  <Link
-                    to="/verification-queue"
-                    className="block w-full bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg p-4 hover:bg-blue-100 dark:hover:bg-blue-800"
-                  >
-                    <div className="flex items-center">
-                      <Shield className="h-5 w-5 mr-2" />
-                      <div>
-                        <h3 className="font-medium">Verification Queue</h3>
-                        <p className="text-sm text-blue-600 dark:text-blue-400">
-                          Help verify reports
-                        </p>
-                      </div>
-                    </div>
                   </Link>
                 </div>
               </div>
+
+              {getFilteredReports().length > 0 ? (
+                <div className="space-y-4">
+                  {getFilteredReports().map((report) => (
+                    <ReportCard key={report.id} report={report} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <AlertTriangle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <h3 className="text-gray-500 dark:text-gray-400 mb-1">
+                    No reports found
+                  </h3>
+                  <p className="text-gray-400 dark:text-gray-500 text-sm">
+                    {searchTerm
+                      ? "Try a different search term"
+                      : "Be the first to report a scam"}
+                  </p>
+                </div>
+              )}
             </div>
-          </div>
-        </>
-      ) : (
-        // My Reports Tab
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-              My Reports
-            </h2>
-            <Link
-              to="/report"
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center"
-            >
-              <FileText className="h-4 w-4 mr-1" />
-              New Report
-            </Link>
           </div>
 
-          {stats?.myReports?.length > 0 ? (
-            <div>
-              {stats?.myReports?.map((report) => (
-                <ReportCard
-                  key={report.id}
-                  report={report}
-                  isUserReport={true}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
-                No reports yet
-              </h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-4">
-                You haven't submitted any reports yet.
+          {/* Sidebar */}
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-medium">API Access</h2>
+                <a
+                  href="/docs"
+                  target="_blank"
+                  className="text-sm text-blue-600 hover:underline"
+                  rel="noopener noreferrer"
+                >
+                  API Docs
+                </a>
+              </div>
+
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                Use your API key to programmatically submit reports or fetch
+                scam data.
               </p>
-              <Link
-                to="/report"
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+
+              {apiLoading && (
+                <p className="text-sm text-gray-400">Loading...</p>
+              )}
+
+              <div className="space-y-2">
+                <div className="bg-gray-100 dark:bg-gray-700 rounded-md px-3 py-2 flex items-center justify-between text-sm text-gray-800 dark:text-gray-200">
+                  <span>
+                    {apiKeys[0]?.api_key?.slice(0, 10)}...
+                    {apiKeys[0]?.api_key?.slice(-5)}
+                  </span>
+                  <button
+                    className="text-xs text-blue-500 hover:underline"
+                    onClick={() =>
+                      navigator.clipboard.writeText(apiKeys[0].api_key)
+                    }
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={generateApiKey}
+                disabled={apiLoading}
+                className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md text-sm font-medium disabled:opacity-50"
               >
-                Submit your first report
-              </Link>
+                + Generate New Key
+              </button>
             </div>
-          )}
+
+            {/* How it works */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+              <h2 className="text-lg font-medium mb-3">How It Works</h2>
+              <ul className="space-y-3">
+                <li className="flex">
+                  <div className="flex-shrink-0 h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 flex items-center justify-center mr-3 mt-0.5">
+                    1
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                    <strong>Report a Scam</strong> - Provide details and stake
+                    SUI tokens
+                  </div>
+                </li>
+                <li className="flex">
+                  <div className="flex-shrink-0 h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 flex items-center justify-center mr-3 mt-0.5">
+                    2
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                    <strong>Community Verification</strong> - Other users verify
+                    your report
+                  </div>
+                </li>
+                <li className="flex">
+                  <div className="flex-shrink-0 h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 flex items-center justify-center mr-3 mt-0.5">
+                    3
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                    <strong>Earn Rewards</strong> - Get SUI tokens for verified
+                    reports
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            {/* Top Scam Types */}
+            <TopScamTypes stats={stats?.topScamTypes} />
+
+            {/* Your Stats */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+              <h2 className="text-lg font-medium mb-3">Your Stats</h2>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-700">
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                    Reports Submitted
+                  </span>
+                  <span className="font-medium">{userReports.length}</span>
+                </div>
+                <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-700">
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                    Reports Verified
+                  </span>
+                  <span className="font-medium">
+                    {
+                      userReports.filter(
+                        (r) => r.status.toLowerCase() === "verified"
+                      ).length
+                    }
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-700">
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                    Total Staked
+                  </span>
+                  <span className="font-medium">
+                    {userReports.reduce((sum, r) => sum + r.stake_amount, 0)}{" "}
+                    SUI
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                    Rewards Earned
+                  </span>
+                  <span className="font-medium text-green-600">
+                    {userReports
+                      .filter((r) => r.rewardTokens)
+                      .reduce((sum, r) => sum + (r.rewardTokens || 0), 0)}{" "}
+                    SUI
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      )}
+      </main>
     </div>
   );
 };

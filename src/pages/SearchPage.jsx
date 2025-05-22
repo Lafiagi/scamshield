@@ -1,126 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import {
-  Search,
-  AlertCircle,
-  ExternalLink,
-  Shield,
-  Clock,
-  Loader2,
-} from "lucide-react";
+import { Search, AlertCircle, Shield, Loader2 } from "lucide-react";
 import axiosClient from "../utils/apiClient";
-
-const SearchResult = ({ report }) => {
-  const statusColors = {
-    verified:
-      "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-    pending:
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-    rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
-  };
-
-  const riskColors = {
-    low: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-    medium:
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-    high: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
-    critical: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
-  };
-
-  const formatScamType = (type) => {
-    const typeMap = {
-      website: "Website",
-      smart_contract: "Smart Contract",
-      social_media: "Social Media",
-      application: "Application",
-      phishing: "Phishing",
-    };
-    return typeMap[type] || type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  const formatStatus = (status) => {
-    const statusMap = {
-      verified: "Verified",
-      pending: "Under Review",
-      rejected: "Rejected",
-    };
-    return statusMap[status] || status.replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  const formatRiskLevel = (risk) => {
-    return risk.replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString();
-  };
-
-  return (
-    <div className="bg-white dark:bg-gray-800 shadow-md rounded-xl p-6 hover:shadow-lg transition-shadow">
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-1">
-            {report.title}
-          </h3>
-          <div className="flex flex-wrap gap-2 mb-2">
-            <span className="px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-              {formatScamType(report.scam_type)}
-            </span>
-            <span
-              className={`px-3 py-1 text-xs rounded-full ${
-                statusColors[report.status]
-              }`}
-            >
-              {formatStatus(report.status)}
-            </span>
-            <span
-              className={`px-3 py-1 text-xs rounded-full ${
-                riskColors[report.risk_level]
-              }`}
-            >
-              {formatRiskLevel(report.risk_level)} Risk
-            </span>
-          </div>
-        </div>
-        <Link
-          to={`/reports/${report.id}`}
-          className="flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-        >
-          <span className="text-sm mr-1">View</span>
-          <ExternalLink className="h-4 w-4" />
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
-        <div className="flex items-center">
-          <span className="text-gray-500 dark:text-gray-400 text-sm mr-2">
-            Reporter:
-          </span>
-          <span className="text-gray-700 dark:text-gray-300 text-sm truncate">
-            {report.reporter_address.slice(0, 6)}...{report.reporter_address.slice(-4)}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
-        <div className="flex items-center">
-          <Shield className="h-4 w-4 mr-1" />
-          <span>
-            {report.verification_count} {report.verification_count === 1 ? 'verification' : 'verifications'}
-          </span>
-        </div>
-        <div className="flex items-center">
-          <Clock className="h-4 w-4 mr-1" />
-          <span>Reported {formatDate(report.created_at)}</span>
-        </div>
-      </div>
-    </div>
-  );
-};
+import SearchResult from "../components/SearchResult";
 
 const FilterSection = ({ filters, setFilters }) => {
   return (
-    <div className="bg-white dark:bg-gray-800 shadow-md rounded-xl p-6 mb-6">
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
           Filters
@@ -134,13 +20,13 @@ const FilterSection = ({ filters, setFilters }) => {
               dateRange: "all",
             })
           }
-          className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+          className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
         >
           Reset All
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Type Filter */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -149,14 +35,18 @@ const FilterSection = ({ filters, setFilters }) => {
           <select
             value={filters.type}
             onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="w-full p-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="all">All Types</option>
             <option value="website">Website</option>
+            <option value="wallet">Wallet</option>
             <option value="smart_contract">Smart Contract</option>
             <option value="social_media">Social Media</option>
-            <option value="application">Application</option>
+            <option value="airdrop">Airdrop</option>
+            <option value="impersonation">Impersonation</option>
             <option value="phishing">Phishing</option>
+            <option value="fake_token">Fake Token</option>
+            <option value="other">Other</option>
           </select>
         </div>
 
@@ -168,7 +58,7 @@ const FilterSection = ({ filters, setFilters }) => {
           <select
             value={filters.status}
             onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="w-full p-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="all">All Statuses</option>
             <option value="verified">Verified</option>
@@ -187,13 +77,12 @@ const FilterSection = ({ filters, setFilters }) => {
             onChange={(e) =>
               setFilters({ ...filters, riskLevel: e.target.value })
             }
-            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="w-full p-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="all">All Risk Levels</option>
-            <option value="critical">Critical</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
             <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
           </select>
         </div>
 
@@ -207,7 +96,7 @@ const FilterSection = ({ filters, setFilters }) => {
             onChange={(e) =>
               setFilters({ ...filters, dateRange: e.target.value })
             }
-            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="w-full p-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="all">All Time</option>
             <option value="day">Last 24 Hours</option>
@@ -232,25 +121,23 @@ const SearchPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sortBy, setSortBy] = useState("date-desc");
-
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   // Fetch reports from API
+  const fetchReports = async (page = 1) => {
+    try {
+      const res = await axiosClient.get(`/reports/?page=${page}`);
+      setReports(res.data.results);
+      setTotalPages(Math.ceil(res.data.count / 3));
+    } catch (err) {
+      console.error("Error loading reports:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
   useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        setLoading(true);
-        const response = await axiosClient.get("/reports/");
-        setReports(response.data);
-        setError(null);
-      } catch (err) {
-        setError("Failed to fetch reports. Please try again later.");
-        console.error("Error fetching reports:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchReports();
-  }, []);
+    fetchReports(page);
+  }, [page]);
 
   // Filter and search logic
   const filteredReports = useMemo(() => {
@@ -264,7 +151,11 @@ const SearchPage = () => {
           report.title.toLowerCase().includes(searchLower) ||
           report.reporter_address.toLowerCase().includes(searchLower) ||
           report.scammer_address.toLowerCase().includes(searchLower) ||
-          report.scam_type.toLowerCase().includes(searchLower)
+          report.scam_type.toLowerCase().includes(searchLower) ||
+          (report.description &&
+            report.description.toLowerCase().includes(searchLower)) ||
+          (report.transaction_hash &&
+            report.transaction_hash.toLowerCase().includes(searchLower))
       );
     }
 
@@ -278,13 +169,15 @@ const SearchPage = () => {
     }
 
     if (filters.riskLevel !== "all") {
-      filtered = filtered.filter((report) => report.risk_level === filters.riskLevel);
+      filtered = filtered.filter(
+        (report) => report.risk_level === filters.riskLevel
+      );
     }
 
     if (filters.dateRange !== "all") {
       const now = new Date();
       let filterDate = new Date();
-      
+
       switch (filters.dateRange) {
         case "day":
           filterDate.setDate(now.getDate() - 1);
@@ -314,10 +207,15 @@ const SearchPage = () => {
         case "date-asc":
           return new Date(a.created_at) - new Date(b.created_at);
         case "risk-desc":
-          const riskOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+          const riskOrder = { high: 3, medium: 2, low: 1 };
           return riskOrder[b.risk_level] - riskOrder[a.risk_level];
         case "verifications-desc":
           return b.verification_count - a.verification_count;
+        case "amount-desc":
+          return (
+            parseFloat(b.transaction_amount || 0) -
+            parseFloat(a.transaction_amount || 0)
+          );
         default:
           return 0;
       }
@@ -341,7 +239,7 @@ const SearchPage = () => {
 
   if (error) {
     return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 text-center">
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 text-center">
         <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-red-800 dark:text-red-300 mb-2">
           Error Loading Reports
@@ -358,29 +256,29 @@ const SearchPage = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="bg-gradient-to-br from-blue-50 to-white dark:from-gray-900 dark:to-gray-800 rounded-3xl p-8 mb-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center justify-center p-3 bg-blue-600 rounded-full shadow-md mb-6">
+      <div className="bg-gradient-to-br from-blue-50 to-white dark:from-gray-900 dark:to-gray-800 rounded-xl p-6 mb-8">
+        <div className="max-w-3xl mx-auto text-center">
+          <div className="inline-flex items-center justify-center p-3 bg-blue-600 rounded-full shadow-md mb-4">
             <Search className="h-6 w-6 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
             Search Scam Reports
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">
-            Search through verified scam reports submitted by the SUI community
-            to protect yourself.
+            Search through verified scam reports to protect yourself and the SUI
+            community
           </p>
 
-          <div className="relative max-w-2xl mx-auto">
+          <div className="relative max-w-xl mx-auto">
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
               <Search className="h-5 w-5 text-gray-400" />
             </div>
             <input
               type="text"
               className="block w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Search by title, address, or type..."
+              placeholder="Search by title, address, description, or transaction hash..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -391,18 +289,19 @@ const SearchPage = () => {
       {/* Filters */}
       <FilterSection filters={filters} setFilters={setFilters} />
 
-      {/* Results Stats */}
-      <div className="flex items-center justify-between mb-4">
+      {/* Results Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div className="flex items-center">
           <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Found {filteredReports.length} reports
+            {filteredReports.length}{" "}
+            {filteredReports.length === 1 ? "report" : "reports"} found
           </h2>
         </div>
         <div className="flex items-center">
           <label
             htmlFor="sort"
-            className="mr-2 text-gray-700 dark:text-gray-300"
+            className="mr-2 text-sm text-gray-700 dark:text-gray-300"
           >
             Sort by:
           </label>
@@ -410,26 +309,47 @@ const SearchPage = () => {
             id="sort"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="p-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="date-desc">Newest First</option>
             <option value="date-asc">Oldest First</option>
             <option value="risk-desc">Highest Risk</option>
             <option value="verifications-desc">Most Verified</option>
+            <option value="amount-desc">Highest Amount</option>
           </select>
         </div>
       </div>
 
       {/* Results Grid */}
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredReports.map((report) => (
           <SearchResult key={report.id} report={report} />
         ))}
+
+        <div className="flex justify-between mt-4">
+          <button
+            onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+            disabled={page === 1}
+            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Prev
+          </button>
+          <span className="text-sm text-gray-600 dark:text-gray-300">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+            disabled={page === totalPages}
+            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
       </div>
 
       {/* No Results */}
       {filteredReports.length === 0 && !loading && (
-        <div className="bg-white dark:bg-gray-800 shadow-md rounded-xl p-10 text-center">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-10 text-center">
           <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             No reports found
@@ -456,7 +376,7 @@ const SearchPage = () => {
       )}
 
       {/* Report CTA */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-800 dark:to-blue-900 rounded-xl p-8 text-center">
+      <div className="mt-12 bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-800 dark:to-blue-900 rounded-xl p-8 text-center">
         <h3 className="text-2xl font-bold text-white mb-4">
           Found a scam that's not listed?
         </h3>
@@ -466,7 +386,7 @@ const SearchPage = () => {
         </p>
         <Link
           to="/report"
-          className="px-6 py-3 bg-white hover:bg-gray-100 text-blue-600 font-medium rounded-lg shadow-md transition-colors inline-flex items-center"
+          className="inline-flex items-center px-6 py-3 bg-white hover:bg-gray-100 text-blue-600 font-medium rounded-lg shadow-md transition-colors"
         >
           <Shield className="h-5 w-5 mr-2" />
           Submit a New Report
