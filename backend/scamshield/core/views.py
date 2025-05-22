@@ -3,8 +3,9 @@ from rest_framework import viewsets, permissions, status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Count
 
 from .models import ScamReport, Evidence, Verification, ScamTactic, TimelineEvent
 from .serializers import (
@@ -13,10 +14,14 @@ from .serializers import (
     ScamReportCreateSerializer,
     VerificationCreateSerializer,
     EvidenceSerializer,
-    VerifyTransactionSerializer
+    VerifyTransactionSerializer,
 )
+from core.filters import ScamReportFilter
+from core.pagination import TenPerPagePagination
+from core.utils import compute_weighted_score
 
 SUI_RPC_URL = "https://fullnode.testnet.sui.io:443"
+
 
 class ScamReportViewSet(viewsets.ModelViewSet):
     """
@@ -25,6 +30,9 @@ class ScamReportViewSet(viewsets.ModelViewSet):
 
     queryset = ScamReport.objects.all().order_by("-created_at")
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = ScamReportFilter
+    pagination_class = TenPerPagePagination
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -202,54 +210,48 @@ class DashboardStatsView(APIView):
     def get(self, request):
         # Total reports
         total_reports = ScamReport.objects.count()
-        most_recent_reports = ScamReport.objects.all().order_by("-created_at")[:3]
-        # Active verifiers (unique verifiers in the last 30 days)
-        thirty_days_ago = timezone.now() - timezone.timedelta(days=60)
-        active_verifiers = (
-            ScamReport.objects.filter(verifications__timestamp__gte=thirty_days_ago)
-            .values("verifications__verifier")
-            .distinct()
-            .count()
-        )
+        most_recent_reports = ScamReport.objects.all().order_by("-created_at")
+        four_most_recent_reports = most_recent_reports[:4]
+        my_most_recent_reports = ScamReport.objects.filter(
+            reporter_address=request.user.wallet_address
+        ).order_by("-created_at")[:4]
 
-        # Protected wallets (unique reporters + unique verifiers)
-        reporters = ScamReport.objects.values("reporter_address").distinct().count()
-        verifiers = (
-            ScamReport.objects.values("verifications__verifier").distinct().count()
-        )
-        protected_wallets = reporters + verifiers
-
+        verified_scams = ScamReport.objects.filter(status="verified")
         prevented_value_sui = (
-            ScamReport.objects.filter(status="verified").aggregate(
-                total=Sum("transaction_amount")
-            )["total"]
-            or 0
+            ScamReport.objects.aggregate(total=Sum("transaction_amount"))["total"] or 0
         )
         prevented_value_usd = prevented_value_sui
-
+        scam_type_counts = (
+            ScamReport.objects.values("scam_type")
+            .annotate(count=Count("id"))
+            .order_by("-count")
+        )
+        top_scam_types = [
+            {
+                "type": entry["scam_type"],
+                "percentage": round((entry["count"] / total_reports) * 100, 1),
+            }
+            for entry in scam_type_counts
+        ]
         stats = {
             "totalReports": total_reports,
-            "activeVerifiers": active_verifiers,
-            "protectedWallets": protected_wallets,
+            "totalVerified": verified_scams.count(),
+            "totalPending": ScamReport.objects.filter(status="pending").count(),
             "preventedValue": (
                 f"${prevented_value_usd/1000000:.1f}M"
                 if prevented_value_usd >= 1000000
                 else f"${prevented_value_usd:.0f}"
             ),
+            "topScamTypes": top_scam_types,
             "recentReports": ScamReportListSerializer(
-                most_recent_reports, many=True
+                four_most_recent_reports, many=True
+            ).data,
+            "myRecentReports": ScamReportListSerializer(
+                my_most_recent_reports, many=True
             ).data,
         }
 
         return Response(stats)
-
-
-
-
-
-
-
-
 
 
 class VerifyTransactionView(APIView):
@@ -305,10 +307,9 @@ class VerifyTransactionView(APIView):
             # Optional reference_id logic (from string-type inputs)
             reference_id = None
             for txn_input in transaction_inputs:
-                if (
-                    txn_input.get("type") == "pure"
-                    and txn_input.get("valueType", "").endswith("String")
-                ):
+                if txn_input.get("type") == "pure" and txn_input.get(
+                    "valueType", ""
+                ).endswith("String"):
                     value = txn_input.get("value", "")
                     if value.startswith("cs_") or value.startswith("ref_"):
                         reference_id = value
@@ -334,3 +335,48 @@ class VerifyTransactionView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=500)
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.utils import timezone
+import math
+from .models import ScamReport
+
+
+class ScamWalletLookupView(APIView):
+    permission_classes = []  # Public endpoint
+
+    def get(self, request):
+        address = request.query_params.get("address")
+        if not address:
+            return Response({"error": "Wallet address is required."}, status=400)
+
+        all_reports = ScamReport.objects.filter(scammer_address__iexact=address)
+        if not all_reports.exists():
+            return Response({"isScam": False, "reports": 0})
+
+        verified_reports = all_reports.filter(status="verified")
+        non_verified_reports = all_reports.exclude(status="verified")  # pending + rejected
+
+
+        score = sum(compute_weighted_score(r, True) for r in verified_reports)
+        score += sum(compute_weighted_score(r, False) for r in non_verified_reports)
+
+        # Risk severity thresholds
+        if score > 20:
+            severity = "Critical"
+        elif score > 10:
+            severity = "High"
+        elif score > 5:
+            severity = "Medium"
+        else:
+            severity = "Low"
+
+        return Response({
+            "isScam": True,
+            "reports": all_reports.count(),
+            "lastReported": all_reports.order_by("-created_at").first().created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": severity,
+            "score": round(score, 2),
+        })

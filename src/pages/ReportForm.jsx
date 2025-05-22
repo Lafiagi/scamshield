@@ -170,7 +170,7 @@ const ReportForm = () => {
       // Update form data with blockchain transaction details
       setFormData((prev) => ({
         ...prev,
-        transaction_hash: result.digest,
+        transaction_digest: result.digest,
         sui_object_id: reportObjectId || "",
       }));
 
