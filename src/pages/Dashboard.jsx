@@ -223,7 +223,7 @@ const Dashboard = () => {
     try {
       setApiLoading(true);
       const res = await axiosClient.get("/merchants/");
-      setApiKeys(res.data || []);
+      setApiKeys(res.data[0].api_key || []);
     } catch (e) {
       console.error("Failed to fetch API keys", e);
     } finally {
@@ -235,7 +235,8 @@ const Dashboard = () => {
     try {
       setApiLoading(true);
       const res = await axiosClient.post("/merchants/1/generate_api_key/");
-      setApiKeys(res.data);
+      console.log("Generated API key:", res.data?.api_key);
+      setApiKeys([res.data?.api_key]);
     } catch (e) {
       console.error("Failed to generate API key", e);
     } finally {
@@ -488,40 +489,36 @@ const Dashboard = () => {
                   API Docs
                 </a>
               </div>
-
               <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
                 Use your API key to programmatically submit reports or fetch
                 scam data.
               </p>
-
               {apiLoading && (
                 <p className="text-sm text-gray-400">Loading...</p>
               )}
-
               <div className="space-y-2">
-                <div className="bg-gray-100 dark:bg-gray-700 rounded-md px-3 py-2 flex items-center justify-between text-sm text-gray-800 dark:text-gray-200">
-                  <span>
-                    {apiKeys[0]?.api_key?.slice(0, 10)}...
-                    {apiKeys[0]?.api_key?.slice(-5)}
-                  </span>
-                  <button
-                    className="text-xs text-blue-500 hover:underline"
-                    onClick={() =>
-                      navigator.clipboard.writeText(apiKeys[0].api_key)
-                    }
-                  >
-                    Copy
-                  </button>
-                </div>
+                {apiKeys?.length > 0 && (
+                  <div className="bg-gray-100 dark:bg-gray-700 rounded-md px-3 py-2 flex items-center justify-between text-sm text-gray-800 dark:text-gray-200 overflow-auto">
+                    <span className="truncate max-w-[calc(100%-60px)]">
+                      {apiKeys.slice(0, 10)}...
+                      {apiKeys.slice(-5)}
+                    </span>
+                    <button
+                      className="text-xs text-blue-500 hover:underline ml-2"
+                      onClick={() => navigator.clipboard.writeText(apiKeys)}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                )}
               </div>
-
               <button
                 onClick={generateApiKey}
                 disabled={apiLoading}
                 className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md text-sm font-medium disabled:opacity-50"
               >
                 + Generate New Key
-              </button>
+              </button>{" "}
             </div>
 
             {/* How it works */}
