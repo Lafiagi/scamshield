@@ -128,7 +128,7 @@ const SearchPage = () => {
     try {
       const res = await axiosClient.get(`/reports/?page=${page}`);
       setReports(res.data.results);
-      setTotalPages(Math.ceil(res.data.count / 3));
+      setTotalPages(Math.ceil(res.data.count / 10));
     } catch (err) {
       console.error("Error loading reports:", err);
     } finally {
@@ -326,7 +326,7 @@ const SearchPage = () => {
           <SearchResult key={report.id} report={report} />
         ))}
 
-        <div className="flex justify-between mt-4">
+        {/* <div className="flex justify-between mt-4">
           <button
             onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
             disabled={page === 1}
@@ -344,7 +344,7 @@ const SearchPage = () => {
           >
             Next
           </button>
-        </div>
+        </div> */}
       </div>
 
       {/* No Results */}
