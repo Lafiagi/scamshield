@@ -16,7 +16,7 @@ SECRET_KEY = "django-insecure-t)!b$nbt_%v$cta!r7oe*-9(6o6og0(f6i#dhsd6jzjjr66e%2
 DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
-CORS_ALLOWED_ORIGINS = ["http://localhost:5173"]
+CORS_ALLOWED_ORIGINS = ["http://localhost:5173", "https://api.ile-wa.com"]
 CORS_ALLOW_HEADERS = (
     *default_headers,
     "X-Wallet-Address",
